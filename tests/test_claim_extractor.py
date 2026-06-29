@@ -50,6 +50,7 @@ async def test_extract_claim_numeric_success(mock_gateway):
     mock_gateway.assert_called_once()
     assert mock_gateway.call_args[1]["text_input"] == sentence
 
+
 @pytest.mark.asyncio
 @patch("app.services.claim_extractor.LLMGateway.acreate_structured_output", new_callable=AsyncMock)
 async def test_extract_claim_non_numeric_success(mock_gateway):
@@ -81,6 +82,7 @@ async def test_extract_claim_non_numeric_success(mock_gateway):
     assert claim.is_numeric is False
     assert claim.topic.name == "Public Transit"
     assert claim.politician.name == "Governor Alexis Vance"
+
 
 @pytest.mark.asyncio
 @patch("app.services.claim_extractor.LLMGateway.acreate_structured_output", new_callable=AsyncMock)

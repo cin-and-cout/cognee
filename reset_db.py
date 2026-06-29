@@ -15,5 +15,6 @@ async def reset_database():
     await cognee.prune.prune_system(metadata=True)
     print("Cognee reset completed successfully.")
 
+
 if __name__ == "__main__":
     asyncio.run(reset_database())

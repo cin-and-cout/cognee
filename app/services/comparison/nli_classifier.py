@@ -68,8 +68,7 @@ async def classify_nli_contradiction(
         return {
             "label": "No prior record",
             "explanation": (
-                "No prior historical claims were found matching "
-                "this topic for the politician."
+                "No prior historical claims were found matching this topic for the politician."
             ),
         }
 
@@ -82,10 +81,7 @@ async def classify_nli_contradiction(
 
     try:
         verdict: NLIVerdictModel = await LLMGateway.acreate_structured_output(
-            text_input=(
-                f"New: {new_claim.statement}\n"
-                f"Historical: {historical_claim.statement}"
-            ),
+            text_input=(f"New: {new_claim.statement}\nHistorical: {historical_claim.statement}"),
             system_prompt=formatted_prompt.strip(),
             response_model=NLIVerdictModel,
         )

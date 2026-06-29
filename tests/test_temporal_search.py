@@ -92,13 +92,15 @@ async def test_temporal_search():
 
     # 4. Query specifically with politician filter
     claims_vance = await get_historical_claims(
-        topic_name="inflation", politician_name="Governor Vance",
+        topic_name="inflation",
+        politician_name="Governor Vance",
     )
     assert len(claims_vance) == 3
 
     # Query with non-existent politician
     claims_other = await get_historical_claims(
-        topic_name="inflation", politician_name="Someone Else",
+        topic_name="inflation",
+        politician_name="Someone Else",
     )
     assert len(claims_other) == 0
 
