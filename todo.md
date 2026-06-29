@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `feature/numeric-diff`
+*   **Current Branch:** `feature/nli-classifier`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -25,7 +25,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 2.2: Structured LLM Claim Extractor using Cognee's LLMGateway and custom extraction prompt.
     *   [x] Task 3.1: Cognee Temporal Search Implementation.
     *   [x] Task 3.2: Deterministic Numeric Diff Logic.
-*   **Next Priority:** Task 3.3 (Qualitative LLM NLI Contradiction Classifier).
+    *   [x] Task 3.3: Qualitative LLM NLI Contradiction Classifier.
+*   **Next Priority:** Task 4.1 (Unified Pipeline Orchestrator).
 
 ---
 
@@ -89,7 +90,7 @@ If you are picking up this project, please follow these instructions:
   - **Issue Link:** #7
   - **Focus:** Core Engine / Mathematics
   - **Verification:** Run `python -m pytest tests/test_numeric_diff.py`.
-- [ ] **[Task 3.3] Qualitative LLM NLI Contradiction Classifier**
+- [x] **[Task 3.3] Qualitative LLM NLI Contradiction Classifier**
   - **Issue Link:** #8
   - **Focus:** Core Engine / NLI
   - **Verification:** Run `python -m pytest tests/test_nli_classifier.py`.
