@@ -22,7 +22,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 1.2: Cognee custom Pydantic schemas (`app/schemas.py`) and a mock corpus of 59 historical statements ([data/historical_claims.json](file:///home/ani/cognee/data/historical_claims.json)).
     *   [x] Task 1.3: Historical data ingestion script using Cognee and database reset setup.
     *   [x] Task 2.1: WebSocket Live-Feed Simulator streaming speech sentences at a configurable interval.
-*   **Next Priority:** Task 2.2 (Structured LLM Claim Extractor).
+    *   [x] Task 2.2: Structured LLM Claim Extractor using Cognee's LLMGateway and custom extraction prompt.
+*   **Next Priority:** Task 3.1 (Cognee Temporal Search Implementation).
 
 ---
 
@@ -72,7 +73,7 @@ If you are picking up this project, please follow these instructions:
   - **Issue Link:** #4
   - **Focus:** API / WebSockets
   - **Verification:** Run `python -m pytest tests/test_websocket_stream.py`.
-- [ ] **[Task 2.2] Structured LLM Claim Extractor**
+- [x] **[Task 2.2] Structured LLM Claim Extractor**
   - **Issue Link:** #5
   - **Focus:** NLP / Claim Extraction
   - **Verification:** Run `python -m pytest tests/test_claim_extractor.py`.
