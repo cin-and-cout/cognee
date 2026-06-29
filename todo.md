@@ -20,7 +20,8 @@ If you are picking up this project, please follow these instructions:
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
     *   [x] Task 1.2: Cognee custom Pydantic schemas (`app/schemas.py`) and a mock corpus of 59 historical statements ([data/historical_claims.json](file:///home/ani/cognee/data/historical_claims.json)).
-*   **Next Priority:** Task 1.3 (Implementing the data ingestion script using Cognee's `temporal_cognify`).
+    *   [x] Task 1.3: Historical data ingestion script using Cognee and database reset setup.
+*   **Next Priority:** Task 2.1 (WebSocket Live-Feed Simulator).
 
 ---
 
@@ -60,7 +61,7 @@ If you are picking up this project, please follow these instructions:
   - **Issue Link:** #2
   - **Focus:** Cognee / Schema Definition
   - **Verification:** Run `pytest tests/test_schemas.py` to verify Pydantic structure.
-- [ ] **[Task 1.3] Historical Data Ingestion Pipeline**
+- [x] **[Task 1.3] Historical Data Ingestion Pipeline**
   - **Issue Link:** #3
   - **Focus:** Data Ingestion
   - **Verification:** Run `python ingest_historical_data.py` and inspect SQLite file.
