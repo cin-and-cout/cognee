@@ -34,7 +34,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 6.1: Chrome Extension Scaffolding.
     *   [x] Task 6.2: Remove Simulator Mocking & Refactor WebSocket Route.
     *   [x] Task 6.3: Chrome Side Panel UI & Neobrutalist Alerts.
-*   **Next Priority:** Task 6.4 (Live DOM Caption Scraper & Web Audio Capturer Integration).
+    *   [x] Task 6.4: Live DOM Caption Scraper & Web Audio Capturer Integration.
+*   **Next Priority:** Task 6.5 (Decommission Old Web Dashboard & Auto-Open Scripting).
 
 ---
 
@@ -133,7 +134,7 @@ If you are picking up this project, please follow these instructions:
 - [x] **[Task 6.3] Chrome Side Panel UI & Neobrutalist Alerts**
   - **Focus:** Extension / Side Panel
   - **Description:** Add `sidepanel.html` and `sidepanel.js` to `app/extension/` and register them in `manifest.json`. Implement a Neobrutalist UI showing live transcript bubbles and high-visibility alert cards when inconsistencies are detected.
-- [ ] **[Task 6.4] Live DOM Caption Scraper & Web Audio Capturer Integration**
+- [x] **[Task 6.4] Live DOM Caption Scraper & Web Audio Capturer Integration**
   - **Focus:** Extension / DOM Scripting
   - **Description:** Hook up `content.js` to YouTube Live caption overlays, parse caption mutations, group words into sentences, and stream them to the background script.
 - [ ] **[Task 6.5] Decommission Old Web Dashboard & Auto-Open Scripting**
