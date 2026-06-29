@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `feature/nli-classifier`
+*   **Current Branch:** `feature/pipeline-orchestrator`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -26,7 +26,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 3.1: Cognee Temporal Search Implementation.
     *   [x] Task 3.2: Deterministic Numeric Diff Logic.
     *   [x] Task 3.3: Qualitative LLM NLI Contradiction Classifier.
-*   **Next Priority:** Task 4.1 (Unified Pipeline Orchestrator).
+    *   [x] Task 4.1: Unified Pipeline Orchestrator.
+*   **Next Priority:** Task 4.2 (Real-time Dashboard UI).
 
 ---
 
@@ -96,7 +97,7 @@ If you are picking up this project, please follow these instructions:
   - **Verification:** Run `python -m pytest tests/test_nli_classifier.py`.
 
 ### Milestone 4: Core Pipeline Integration & Web Dashboard (Should Have)
-- [ ] **[Task 4.1] Unified Pipeline Orchestrator**
+- [x] **[Task 4.1] Unified Pipeline Orchestrator**
   - **Issue Link:** #9
   - **Focus:** System Integration
   - **Verification:** Run `python run_pipeline.py --input speech_sample.txt`.
