@@ -9,11 +9,13 @@ def test_politician_schema():
     assert politician.name == "Senator Jane Doe"
     assert politician.party == "Independent"
 
+
 def test_topic_schema():
     parent = Topic(name="Economy")
     child = Topic(name="Inflation", parent_topic=parent)
     assert child.name == "Inflation"
     assert child.parent_topic == parent
+
 
 def test_claim_schema():
     politician = Politician(name="Senator Jane Doe", party="Independent")
@@ -51,6 +53,7 @@ def test_claim_schema():
     assert numeric_claim.metric == "inflation rate"
     assert numeric_claim.value == 3.2
     assert numeric_claim.unit == "%"
+
 
 def test_missing_required_fields():
     # Attempting to create a claim without required politician/topic fields

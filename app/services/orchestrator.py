@@ -48,10 +48,7 @@ async def process_incoming_sentence(
     latest_historical: Optional[Claim] = None
     for claim in historical_claims:
         if claim.claim_date < new_claim.claim_date:
-            if (
-                not latest_historical
-                or claim.claim_date > latest_historical.claim_date
-            ):
+            if not latest_historical or claim.claim_date > latest_historical.claim_date:
                 latest_historical = claim
 
     # 3. Perform comparison if a prior record exists

@@ -49,6 +49,7 @@ async def test_ingest_historical_data_success(mock_cognify, mock_add_data_points
     # 2. Verify cognify was called with temporal_cognify=True
     mock_cognify.assert_called_once_with(temporal_cognify=True)
 
+
 @pytest.mark.asyncio
 async def test_ingest_data_missing_file():
     """

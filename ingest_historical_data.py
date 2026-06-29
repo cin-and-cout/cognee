@@ -11,6 +11,7 @@ from app.schemas import Claim, Politician, Topic
 # Load environment variables (such as OPENAI_API_KEY) from .env
 load_dotenv()
 
+
 async def ingest_data(file_path: str = "data/historical_claims.json"):
     """
     Ingests mock historical claims from a JSON file into Cognee.
@@ -74,6 +75,7 @@ async def ingest_data(file_path: str = "data/historical_claims.json"):
     print("Running temporal cognify pipeline (graph construction & indexing)...")
     await cognee.cognify(temporal_cognify=True)
     print("Ingestion pipeline finished successfully!")
+
 
 if __name__ == "__main__":
     asyncio.run(ingest_data())

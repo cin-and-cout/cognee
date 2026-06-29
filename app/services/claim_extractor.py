@@ -10,6 +10,7 @@ class ExtractedClaimModel(BaseModel):
     """
     Pydantic model representing structured output from the LLM for claim extraction.
     """
+
     has_claim: bool = Field(
         ...,
         description=(
@@ -52,6 +53,7 @@ class ExtractedClaimModel(BaseModel):
         description="The unit of measurement (e.g., %, units, $) if is_numeric is True.",
     )
 
+
 SYSTEM_PROMPT = """
 You are an expert fact-checking assistant. Your task is to analyze a single sentence
 from a politician's speech and extract any checkable factual claims or specific policy commitments.
@@ -70,6 +72,7 @@ Identify if the sentence contains a checkable claim. If it does:
 3. Determine if it is a numeric claim (contains a specific stat, count, rate, or dollar amount).
 4. If it is numeric, extract the metric, the float value, and the unit.
 """
+
 
 async def extract_claim_from_text(
     text: str,
