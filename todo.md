@@ -35,7 +35,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 6.2: Remove Simulator Mocking & Refactor WebSocket Route.
     *   [x] Task 6.3: Chrome Side Panel UI & Neobrutalist Alerts.
     *   [x] Task 6.4: Live DOM Caption Scraper & Web Audio Capturer Integration.
-*   **Next Priority:** Task 6.5 (Decommission Old Web Dashboard & Auto-Open Scripting).
+    *   [x] Task 6.5: Decommission Old Web Dashboard & Auto-Open Scripting.
+*   **Next Priority:** None (All milestone tasks completed).
 
 ---
 
@@ -137,6 +138,6 @@ If you are picking up this project, please follow these instructions:
 - [x] **[Task 6.4] Live DOM Caption Scraper & Web Audio Capturer Integration**
   - **Focus:** Extension / DOM Scripting
   - **Description:** Hook up `content.js` to YouTube Live caption overlays, parse caption mutations, group words into sentences, and stream them to the background script.
-- [ ] **[Task 6.5] Decommission Old Web Dashboard & Auto-Open Scripting**
+- [x] **[Task 6.5] Decommission Old Web Dashboard & Auto-Open Scripting**
   - **Focus:** Cleanup
   - **Description:** Remove the old FastAPI HTML template serving, clean up `Makefile` commands to stop executing browser auto-opens, and ensure the backend serves exclusively as a headless WebSocket/HTTP API.
