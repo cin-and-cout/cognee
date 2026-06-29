@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, Optional
 
 import cognee
@@ -71,11 +72,18 @@ async def process_incoming_sentence(
             "type": "none",
         }
 
-    # 4. Ingest the new claim so it's recorded historically
-    await add_data_points(
-        [new_claim.politician, new_claim.topic, new_claim],
-    )
-    await cognee.cognify(temporal_cognify=True)
+    # 4. Ingest the new claim historically in the background to minimize response latency
+    async def run_ingestion():
+        try:
+            await add_data_points([new_claim.politician, new_claim.topic, new_claim])
+            await cognee.cognify(temporal_cognify=True)
+        except Exception:
+            # Silence background errors to prevent API disruption
+            pass
+
+    asyncio.create_task(run_ingestion())
+    # Yield control to event loop so background task can start executing
+    await asyncio.sleep(0.001)
 
     # 5. Build and return report
     report = {

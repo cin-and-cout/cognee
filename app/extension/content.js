@@ -24,10 +24,10 @@ const observer = new MutationObserver((mutations) => {
   if (/[.!?]$/.test(fullText)) {
     sendSentence(fullText);
   } else {
-    // Otherwise, wait 2 seconds of silence before sending the segment as a sentence
+    // Otherwise, wait 800ms of silence before sending the segment as a sentence
     segmentTimeout = setTimeout(() => {
       sendSentence(fullText);
-    }, 2000);
+    }, 800);
   }
 });
 
