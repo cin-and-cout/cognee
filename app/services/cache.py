@@ -47,7 +47,7 @@ def set_cached_verdict(text: str, report: Dict[str, Any]):
     _cache[key] = report
 
     # Avoid overwriting the production cache when running tests
-    if "pytest" in sys.modules:
+    if "pytest" in sys.modules and CACHE_FILE_PATH.endswith("demo_cache.json"):
         return
 
     try:
