@@ -1,0 +1,768 @@
+[
+    {
+        "statement": "Inflation remains a significant challenge for working families, standing at 5.4%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2024-01-15",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-1",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 5.4,
+        "unit": "%"
+    },
+    {
+        "statement": "We are seeing early signs of relief as inflation edges down to 5.2%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2024-04-10",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-2",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 5.2,
+        "unit": "%"
+    },
+    {
+        "statement": "Our economic initiatives are working; inflation has dropped below five percent to 4.8%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2024-07-22",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-3",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 4.8,
+        "unit": "%"
+    },
+    {
+        "statement": "We have brought inflation down to 4.5% through targeted relief measures.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2024-10-05",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-4",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 4.5,
+        "unit": "%"
+    },
+    {
+        "statement": "Entering the new year, inflation has stabilized at a manageable 4.2%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2025-01-18",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-5",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 4.2,
+        "unit": "%"
+    },
+    {
+        "statement": "For the first time in two years, inflation is under four percent at 3.9%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2025-04-20",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-6",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 3.9,
+        "unit": "%"
+    },
+    {
+        "statement": "Inflation has dropped significantly to 3.5% this quarter.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2025-06-12",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-7",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 3.5,
+        "unit": "%"
+    },
+    {
+        "statement": "Stable growth has anchored inflation down to 3.2%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2025-09-08",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-8",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 3.2,
+        "unit": "%"
+    },
+    {
+        "statement": "We close out 2025 with inflation resting at a low 3.1%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2025-12-15",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-9",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 3.1,
+        "unit": "%"
+    },
+    {
+        "statement": "Inflation saw a minor seasonal uptick to 3.6% last month, but the long-term trend remains positive.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Inflation",
+        "claim_date": "2026-03-10",
+        "source_link": "https://archive.gov/statements/vance-inflation-report-10",
+        "is_numeric": true,
+        "metric": "inflation rate",
+        "value": 3.6,
+        "unit": "%"
+    },
+    {
+        "statement": "Unemployment is currently at 6.2%, which is higher than we want.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2024-02-05",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-1",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 6.2,
+        "unit": "%"
+    },
+    {
+        "statement": "Job growth is picking up, lowering unemployment slightly to 6.0%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2024-05-12",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-2",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 6.0,
+        "unit": "%"
+    },
+    {
+        "statement": "Unemployment has decreased to 5.8% as our jobs program takes hold.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2024-08-18",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-3",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 5.8,
+        "unit": "%"
+    },
+    {
+        "statement": "We have successfully lowered the unemployment rate to 5.5%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2024-11-20",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-4",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 5.5,
+        "unit": "%"
+    },
+    {
+        "statement": "Job creation remains resilient, bringing unemployment down to 5.1%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2025-02-14",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-5",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 5.1,
+        "unit": "%"
+    },
+    {
+        "statement": "Our state's unemployment rate has fallen further to 4.7%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2025-05-25",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-6",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 4.7,
+        "unit": "%"
+    },
+    {
+        "statement": "We are approaching full employment with our unemployment rate sitting at 4.5%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2025-07-30",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-7",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 4.5,
+        "unit": "%"
+    },
+    {
+        "statement": "Unemployment continues its downward trajectory, now at 4.2%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2025-10-10",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-8",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 4.2,
+        "unit": "%"
+    },
+    {
+        "statement": "We end the year with a historic low unemployment rate of 4.0%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2025-12-22",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-9",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 4.0,
+        "unit": "%"
+    },
+    {
+        "statement": "Unemployment registered a slight increase to 4.3% due to seasonal contract endings.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Unemployment",
+        "claim_date": "2026-04-05",
+        "source_link": "https://archive.gov/statements/vance-jobs-report-10",
+        "is_numeric": true,
+        "metric": "unemployment rate",
+        "value": 4.3,
+        "unit": "%"
+    },
+    {
+        "statement": "First quarter GDP growth stands at a modest 1.8% annual rate.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "GDP Growth",
+        "claim_date": "2024-03-01",
+        "source_link": "https://archive.gov/statements/vance-gdp-1",
+        "is_numeric": true,
+        "metric": "gdp growth rate",
+        "value": 1.8,
+        "unit": "%"
+    },
+    {
+        "statement": "Our growth has accelerated to 2.1% this quarter.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "GDP Growth",
+        "claim_date": "2024-06-01",
+        "source_link": "https://archive.gov/statements/vance-gdp-2",
+        "is_numeric": true,
+        "metric": "gdp growth rate",
+        "value": 2.1,
+        "unit": "%"
+    },
+    {
+        "statement": "GDP growth is expanding steadily, registered at 2.4% last quarter.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "GDP Growth",
+        "claim_date": "2024-09-01",
+        "source_link": "https://archive.gov/statements/vance-gdp-3",
+        "is_numeric": true,
+        "metric": "gdp growth rate",
+        "value": 2.4,
+        "unit": "%"
+    },
+    {
+        "statement": "We finish the fiscal year with strong GDP growth of 2.6%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "GDP Growth",
+        "claim_date": "2024-12-01",
+        "source_link": "https://archive.gov/statements/vance-gdp-4",
+        "is_numeric": true,
+        "metric": "gdp growth rate",
+        "value": 2.6,
+        "unit": "%"
+    },
+    {
+        "statement": "Economic momentum continues to build, driving GDP growth up to 2.8%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "GDP Growth",
+        "claim_date": "2025-03-01",
+        "source_link": "https://archive.gov/statements/vance-gdp-5",
+        "is_numeric": true,
+        "metric": "gdp growth rate",
+        "value": 2.8,
+        "unit": "%"
+    },
+    {
+        "statement": "We have achieved a robust GDP growth rate of 3.0% this quarter.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "GDP Growth",
+        "claim_date": "2025-06-01",
+        "source_link": "https://archive.gov/statements/vance-gdp-6",
+        "is_numeric": true,
+        "metric": "gdp growth rate",
+        "value": 3.0,
+        "unit": "%"
+    },
+    {
+        "statement": "GDP growth remains highly healthy, holding steady at 2.9%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "GDP Growth",
+        "claim_date": "2025-09-01",
+        "source_link": "https://archive.gov/statements/vance-gdp-7",
+        "is_numeric": true,
+        "metric": "gdp growth rate",
+        "value": 2.9,
+        "unit": "%"
+    },
+    {
+        "statement": "Our annual growth rate has reached a peak of 3.2%.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "GDP Growth",
+        "claim_date": "2025-12-01",
+        "source_link": "https://archive.gov/statements/vance-gdp-8",
+        "is_numeric": true,
+        "metric": "gdp growth rate",
+        "value": 3.2,
+        "unit": "%"
+    },
+    {
+        "statement": "GDP growth has normalized to 2.7% as expected following the holidays.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "GDP Growth",
+        "claim_date": "2026-03-01",
+        "source_link": "https://archive.gov/statements/vance-gdp-9",
+        "is_numeric": true,
+        "metric": "gdp growth rate",
+        "value": 2.7,
+        "unit": "%"
+    },
+    {
+        "statement": "We are committed to fully funding public transit expansions without increasing passenger fares.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2024-02-15",
+        "source_link": "https://archive.gov/statements/vance-transit-1",
+        "is_numeric": false
+    },
+    {
+        "statement": "Our priority is to transition our bus fleet to 100% clean electric power by 2030.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2024-05-20",
+        "source_link": "https://archive.gov/statements/vance-transit-2",
+        "is_numeric": false
+    },
+    {
+        "statement": "We will not cut funding for regional rail services under any budgetary circumstance.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2024-08-25",
+        "source_link": "https://archive.gov/statements/vance-transit-3",
+        "is_numeric": false
+    },
+    {
+        "statement": "Our transit policy focuses on expanding subway routes into underserved residential suburbs.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2024-11-10",
+        "source_link": "https://archive.gov/statements/vance-transit-4",
+        "is_numeric": false
+    },
+    {
+        "statement": "We will maintain fare subsidies for low-income families and students indefinitely.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2025-02-28",
+        "source_link": "https://archive.gov/statements/vance-transit-5",
+        "is_numeric": false
+    },
+    {
+        "statement": "We have initiated procurement for 200 new hybrid buses to replace older diesel models.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2025-06-15",
+        "source_link": "https://archive.gov/statements/vance-transit-6",
+        "is_numeric": false
+    },
+    {
+        "statement": "Our administration supports public-private partnerships to fund transit infrastructure updates.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2025-09-20",
+        "source_link": "https://archive.gov/statements/vance-transit-7",
+        "is_numeric": false
+    },
+    {
+        "statement": "We are on track to complete the downtown metro line link by the end of next year.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2025-11-05",
+        "source_link": "https://archive.gov/statements/vance-transit-8",
+        "is_numeric": false
+    },
+    {
+        "statement": "We stand firmly against transit service privatization; transit is a public utility.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2026-02-18",
+        "source_link": "https://archive.gov/statements/vance-transit-9",
+        "is_numeric": false
+    },
+    {
+        "statement": "To offset inflation, we are reviewing minor ticket price adjustments for express routes.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Public Transit",
+        "claim_date": "2026-05-01",
+        "source_link": "https://archive.gov/statements/vance-transit-10",
+        "is_numeric": false
+    },
+    {
+        "statement": "We have built 1,500 new affordable housing units this year.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2024-03-10",
+        "source_link": "https://archive.gov/statements/vance-housing-1",
+        "is_numeric": true,
+        "metric": "affordable housing units built",
+        "value": 1500,
+        "unit": "units"
+    },
+    {
+        "statement": "Our housing program has delivered 2,200 affordable homes to families.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2024-06-18",
+        "source_link": "https://archive.gov/statements/vance-housing-2",
+        "is_numeric": true,
+        "metric": "affordable housing units built",
+        "value": 2200,
+        "unit": "units"
+    },
+    {
+        "statement": "Our mid-term target has been met: 3,000 affordable units are now completed.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2024-09-12",
+        "source_link": "https://archive.gov/statements/vance-housing-3",
+        "is_numeric": true,
+        "metric": "affordable housing units built",
+        "value": 3000,
+        "unit": "units"
+    },
+    {
+        "statement": "We finished 2024 with a total of 4,500 new affordable units.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2024-12-18",
+        "source_link": "https://archive.gov/statements/vance-housing-4",
+        "is_numeric": true,
+        "metric": "affordable housing units built",
+        "value": 4500,
+        "unit": "units"
+    },
+    {
+        "statement": "We have increased our housing inventory to 5,200 affordable units.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2025-03-25",
+        "source_link": "https://archive.gov/statements/vance-housing-5",
+        "is_numeric": true,
+        "metric": "affordable housing units built",
+        "value": 5200,
+        "unit": "units"
+    },
+    {
+        "statement": "Over 6,500 families have been placed in our state-funded affordable housing program.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2025-06-28",
+        "source_link": "https://archive.gov/statements/vance-housing-6",
+        "is_numeric": true,
+        "metric": "families housed in affordable units",
+        "value": 6500,
+        "unit": "families"
+    },
+    {
+        "statement": "We are expanding our reach: 8,000 affordable housing units are now online.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2025-09-15",
+        "source_link": "https://archive.gov/statements/vance-housing-7",
+        "is_numeric": true,
+        "metric": "affordable housing units built",
+        "value": 8000,
+        "unit": "units"
+    },
+    {
+        "statement": "We have achieved our grand milestone of constructing 10,000 affordable units.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2025-12-05",
+        "source_link": "https://archive.gov/statements/vance-housing-8",
+        "is_numeric": true,
+        "metric": "affordable housing units built",
+        "value": 10000,
+        "unit": "units"
+    },
+    {
+        "statement": "The inventory has reached 10,800 units, keeping us on track for our 2026 projections.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2026-02-20",
+        "source_link": "https://archive.gov/statements/vance-housing-9",
+        "is_numeric": true,
+        "metric": "affordable housing units built",
+        "value": 10800,
+        "unit": "units"
+    },
+    {
+        "statement": "We have successfully built 11,500 affordable homes across the metropolitan area.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Affordable Housing",
+        "claim_date": "2026-05-15",
+        "source_link": "https://archive.gov/statements/vance-housing-10",
+        "is_numeric": true,
+        "metric": "affordable housing units built",
+        "value": 11500,
+        "unit": "units"
+    },
+    {
+        "statement": "I pledge that we will not increase middle-class income taxes during my administration.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2024-01-20",
+        "source_link": "https://archive.gov/statements/vance-taxes-1",
+        "is_numeric": false
+    },
+    {
+        "statement": "Our tax code must favor working families; we will keep corporate tax rates competitive but fair.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2024-04-15",
+        "source_link": "https://archive.gov/statements/vance-taxes-2",
+        "is_numeric": false
+    },
+    {
+        "statement": "We are implementing tax rebates for child care to assist working parents.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2024-07-10",
+        "source_link": "https://archive.gov/statements/vance-taxes-3",
+        "is_numeric": false
+    },
+    {
+        "statement": "We stand against any proposal to implement a state sales tax on fresh groceries.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2024-10-18",
+        "source_link": "https://archive.gov/statements/vance-taxes-4",
+        "is_numeric": false
+    },
+    {
+        "statement": "Our tax policies have provided an average family rebate of $400 this tax season.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2025-01-22",
+        "source_link": "https://archive.gov/statements/vance-taxes-5",
+        "is_numeric": false
+    },
+    {
+        "statement": "We will close corporate tax loopholes that let multi-millionaires avoid their fair share.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2025-04-12",
+        "source_link": "https://archive.gov/statements/vance-taxes-6",
+        "is_numeric": false
+    },
+    {
+        "statement": "Middle-class tax rates will remain untouched to encourage spending and economic growth.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2025-07-08",
+        "source_link": "https://archive.gov/statements/vance-taxes-7",
+        "is_numeric": false
+    },
+    {
+        "statement": "We are introducing a green tax credit for homeowners installing residential solar panels.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2025-10-15",
+        "source_link": "https://archive.gov/statements/vance-taxes-8",
+        "is_numeric": false
+    },
+    {
+        "statement": "We must protect the middle-class tax freeze that has anchored our state's economy.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2026-01-28",
+        "source_link": "https://archive.gov/statements/vance-taxes-9",
+        "is_numeric": false
+    },
+    {
+        "statement": "We are exploring a temporary 1% surcharge on estates valued over $10 million to fund public education.",
+        "politician": {
+            "name": "Governor Alexis Vance",
+            "party": "Progressive Coalition"
+        },
+        "topic": "Taxation",
+        "claim_date": "2026-04-20",
+        "source_link": "https://archive.gov/statements/vance-taxes-10",
+        "is_numeric": false
+    }
+]
