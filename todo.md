@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `feature/pipeline-orchestrator`
+*   **Current Branch:** `feature/dashboard-ui`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -27,7 +27,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 3.2: Deterministic Numeric Diff Logic.
     *   [x] Task 3.3: Qualitative LLM NLI Contradiction Classifier.
     *   [x] Task 4.1: Unified Pipeline Orchestrator.
-*   **Next Priority:** Task 4.2 (Real-time Dashboard UI).
+    *   [x] Task 4.2: Real-time Dashboard UI.
+*   **Next Priority:** Task 5.1 (Demo Verdict Cache System).
 
 ---
 
@@ -101,7 +102,7 @@ If you are picking up this project, please follow these instructions:
   - **Issue Link:** #9
   - **Focus:** System Integration
   - **Verification:** Run `python run_pipeline.py --input speech_sample.txt`.
-- [ ] **[Task 4.2] Real-time Dashboard UI**
+- [x] **[Task 4.2] Real-time Dashboard UI**
   - **Issue Link:** #10
   - **Focus:** Frontend / Dashboard
   - **Verification:** Open dashboard UI in browser and monitor visual cards.
