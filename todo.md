@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `feature/cognee-schemas`
+*   **Current Branch:** `feature/temporal-search`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -23,7 +23,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 1.3: Historical data ingestion script using Cognee and database reset setup.
     *   [x] Task 2.1: WebSocket Live-Feed Simulator streaming speech sentences at a configurable interval.
     *   [x] Task 2.2: Structured LLM Claim Extractor using Cognee's LLMGateway and custom extraction prompt.
-*   **Next Priority:** Task 3.1 (Cognee Temporal Search Implementation).
+    *   [x] Task 3.1: Cognee Temporal Search Implementation.
+*   **Next Priority:** Task 3.2 (Deterministic Numeric Diff Logic).
 
 ---
 
@@ -79,7 +80,7 @@ If you are picking up this project, please follow these instructions:
   - **Verification:** Run `python -m pytest tests/test_claim_extractor.py`.
 
 ### Milestone 3: Temporal Retrieval & Hybrid Comparison Engine (Must Have)
-- [ ] **[Task 3.1] Cognee Temporal Search Implementation**
+- [x] **[Task 3.1] Cognee Temporal Search Implementation**
   - **Issue Link:** #6
   - **Focus:** Cognee / Retrieval
   - **Verification:** Run `python -m pytest tests/test_temporal_search.py`.
