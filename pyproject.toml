@@ -1,0 +1,16 @@
+[tool.ruff]
+# Target Python version
+target-version = "py311"
+
+# Line length limit
+line-length = 100
+
+# Enable Pyflakes (F) and pycodestyle (E, W) codes by default
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "A", "COM", "C4", "Q", "T20"]
+ignore = []
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-single-line = false
+known-first-party = ["app"]
