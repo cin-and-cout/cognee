@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `feature/dashboard-ui`
+*   **Current Branch:** `feature/demo-cache`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -28,7 +28,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 3.3: Qualitative LLM NLI Contradiction Classifier.
     *   [x] Task 4.1: Unified Pipeline Orchestrator.
     *   [x] Task 4.2: Real-time Dashboard UI.
-*   **Next Priority:** Task 5.1 (Demo Verdict Cache System).
+    *   [x] Task 5.1: Demo Verdict Cache System.
+*   **Next Priority:** Task 5.2 (Code Polish, Testing, and Documentation).
 
 ---
 
@@ -108,7 +109,7 @@ If you are picking up this project, please follow these instructions:
   - **Verification:** Open dashboard UI in browser and monitor visual cards.
 
 ### Milestone 5: Verification, Caching & Polish (Should Have)
-- [ ] **[Task 5.1] Demo Verdict Cache System**
+- [x] **[Task 5.1] Demo Verdict Cache System**
   - **Issue Link:** #11
   - **Focus:** Performance / Caching
   - **Verification:** Run integration tests and check console for cache hits.

@@ -1,0 +1,185 @@
+{
+    "i am pleased to announce that inflation has decreased to 2.8% this month.": {
+        "new_claim": {
+            "statement": "Inflation has decreased to 2.8% this month.",
+            "claim_date": "2026-06-29",
+            "is_numeric": true,
+            "value": 2.8,
+            "unit": "%",
+            "metric": "inflation rate",
+            "topic": "Inflation"
+        },
+        "historical_claim": {
+            "statement": "Inflation saw a minor seasonal uptick to 3.6% last month, but the long-term trend remains positive.",
+            "claim_date": "2026-03-10",
+            "is_numeric": true,
+            "value": 3.6,
+            "unit": "%",
+            "metric": "inflation rate"
+        },
+        "verdict": {
+            "is_consistent": true,
+            "absolute_drift": 0.8,
+            "percentage_variance": 22.2,
+            "label": "Consistent with prior statements",
+            "explanation": "Stated figure of 2.8% is consistent with the decreasing trend from 3.6%.",
+            "type": "numeric"
+        }
+    },
+    "we are proposing a 1% surcharge on estates over $10 million.": {
+        "new_claim": {
+            "statement": "We are proposing a 1% surcharge on estates over $10 million.",
+            "claim_date": "2026-06-29",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "Taxation"
+        },
+        "historical_claim": {
+            "statement": "We are exploring a temporary 1% surcharge on estates valued over $10 million to fund public education.",
+            "claim_date": "2026-04-20",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Consistent with prior statements",
+            "explanation": "The proposal of a 1% surcharge on estates over $10 million is consistent with the prior statement of exploring the policy.",
+            "type": "qualitative"
+        }
+    },
+    "unemployment continues to be a concern, but it has stabilized at 4.2%.": {
+        "new_claim": {
+            "statement": "Unemployment has stabilized at 4.2%.",
+            "claim_date": "2026-06-29",
+            "is_numeric": true,
+            "value": 4.2,
+            "unit": "%",
+            "metric": "unemployment rate",
+            "topic": "Unemployment"
+        },
+        "historical_claim": {
+            "statement": "Unemployment registered a slight increase to 4.3% due to seasonal contract endings.",
+            "claim_date": "2026-04-05",
+            "is_numeric": true,
+            "value": 4.3,
+            "unit": "%",
+            "metric": "unemployment rate"
+        },
+        "verdict": {
+            "is_consistent": true,
+            "absolute_drift": 0.1,
+            "percentage_variance": 2.3,
+            "label": "Consistent with prior statements",
+            "explanation": "Stated figure of 4.2% is within the acceptable 10% variance of 4.3%.",
+            "type": "numeric"
+        }
+    },
+    "i am proud to report that inflation has now dropped to 2.8% this month.": {
+        "new_claim": {
+            "statement": "Inflation has now dropped to 2.8% this month.",
+            "claim_date": "2026-06-29",
+            "is_numeric": true,
+            "value": 2.8,
+            "unit": "%",
+            "metric": "inflation rate",
+            "topic": "Inflation"
+        },
+        "historical_claim": {
+            "statement": "Inflation saw a minor seasonal uptick to 3.6% last month, but the long-term trend remains positive.",
+            "claim_date": "2026-03-10",
+            "is_numeric": true,
+            "value": 3.6,
+            "unit": "%",
+            "metric": "inflation rate"
+        },
+        "verdict": {
+            "is_consistent": true,
+            "absolute_drift": 0.8,
+            "percentage_variance": 22.2,
+            "label": "Consistent with prior statements",
+            "explanation": "Stated figure of 2.8% is consistent with the decreasing trend from 3.6%.",
+            "type": "numeric"
+        }
+    },
+    "unemployment has slightly risen to 4.5% due to seasonal adjustments.": {
+        "new_claim": {
+            "statement": "Unemployment has slightly risen to 4.5% due to seasonal adjustments.",
+            "claim_date": "2026-06-29",
+            "is_numeric": true,
+            "value": 4.5,
+            "unit": "%",
+            "metric": "unemployment rate",
+            "topic": "Unemployment"
+        },
+        "historical_claim": {
+            "statement": "Unemployment registered a slight increase to 4.3% due to seasonal contract endings.",
+            "claim_date": "2026-04-05",
+            "is_numeric": true,
+            "value": 4.3,
+            "unit": "%",
+            "metric": "unemployment rate"
+        },
+        "verdict": {
+            "is_consistent": true,
+            "absolute_drift": 0.2,
+            "percentage_variance": 4.7,
+            "label": "Consistent with prior statements",
+            "explanation": "Stated figure of 4.5% is within the acceptable 10% variance of 4.3%.",
+            "type": "numeric"
+        }
+    },
+    "we are freezing passenger fares for all public transit routes indefinitely.": {
+        "new_claim": {
+            "statement": "We are freezing passenger fares for all public transit routes indefinitely.",
+            "claim_date": "2026-06-29",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "Public Transit"
+        },
+        "historical_claim": {
+            "statement": "To offset inflation, we are reviewing minor ticket price adjustments for express routes.",
+            "claim_date": "2026-05-01",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2026-05-01",
+            "explanation": "Freezing passenger fares indefinitely directly contradicts the decision to review ticket price adjustments to offset inflation.",
+            "type": "qualitative"
+        }
+    },
+    "we have successfully built 12,000 affordable homes across the metropolitan area.": {
+        "new_claim": {
+            "statement": "We have successfully built 12,000 affordable homes across the metropolitan area.",
+            "claim_date": "2026-06-29",
+            "is_numeric": true,
+            "value": 12000,
+            "unit": "units",
+            "metric": "affordable housing units built",
+            "topic": "Affordable Housing"
+        },
+        "historical_claim": {
+            "statement": "We have successfully built 11,500 affordable homes across the metropolitan area.",
+            "claim_date": "2026-05-15",
+            "is_numeric": true,
+            "value": 11500,
+            "unit": "units",
+            "metric": "affordable housing units built"
+        },
+        "verdict": {
+            "is_consistent": true,
+            "absolute_drift": 500,
+            "percentage_variance": 4.3,
+            "label": "Consistent with prior statements",
+            "explanation": "Stated figure of 12000 units is within the acceptable 10% variance of 11500 units.",
+            "type": "numeric"
+        }
+    }
+}
