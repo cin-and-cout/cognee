@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `feature/temporal-search`
+*   **Current Branch:** `feature/numeric-diff`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -24,7 +24,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 2.1: WebSocket Live-Feed Simulator streaming speech sentences at a configurable interval.
     *   [x] Task 2.2: Structured LLM Claim Extractor using Cognee's LLMGateway and custom extraction prompt.
     *   [x] Task 3.1: Cognee Temporal Search Implementation.
-*   **Next Priority:** Task 3.2 (Deterministic Numeric Diff Logic).
+    *   [x] Task 3.2: Deterministic Numeric Diff Logic.
+*   **Next Priority:** Task 3.3 (Qualitative LLM NLI Contradiction Classifier).
 
 ---
 
@@ -84,7 +85,7 @@ If you are picking up this project, please follow these instructions:
   - **Issue Link:** #6
   - **Focus:** Cognee / Retrieval
   - **Verification:** Run `python -m pytest tests/test_temporal_search.py`.
-- [ ] **[Task 3.2] Deterministic Numeric Diff Logic**
+- [x] **[Task 3.2] Deterministic Numeric Diff Logic**
   - **Issue Link:** #7
   - **Focus:** Core Engine / Mathematics
   - **Verification:** Run `python -m pytest tests/test_numeric_diff.py`.
