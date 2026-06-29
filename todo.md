@@ -31,7 +31,7 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 5.1: Demo Verdict Cache System.
     *   [x] Task 5.2: Code Polish, Testing, and Documentation.
     *   [x] Added Makefile for starting, stopping, cleaning up ports, and testing.
-*   **Next Priority:** None (All milestone tasks completed).
+*   **Next Priority:** Milestone 6: Browser Extension & Live Streaming Integration.
 
 ---
 
@@ -119,3 +119,17 @@ If you are picking up this project, please follow these instructions:
   - **Issue Link:** #12
   - **Focus:** QA / Documentation
   - **Verification:** Run `poetry run pytest --cov=app` to confirm 80%+ coverage.
+
+### Milestone 6: Browser Extension & Live Streaming Integration (Could Have)
+- [ ] **[Task 6.1] Chrome Extension Scaffolding**
+  - **Focus:** Extension / Scaffolding
+  - **Description:** Initialize `app/extension/` directory with a standard `manifest.json` (v3) specifying permissions for activeTab and sidePanel. Create a glassmorphic connection popup (`popup.html`/`popup.js`) and background worker skeleton.
+- [ ] **[Task 6.2] WebSocket Input Stream Integration**
+  - **Focus:** Backend / API
+  - **Description:** Refactor the WebSocket route `/ws/live-speech` in `app/api/websocket.py` to allow incoming message payload payloads from client streams. Pass received sentences to the unified orchestrator to perform live comparison checks and broadcast resulting verdicts.
+- [ ] **[Task 6.3] Live DOM Caption Scraper & Web Audio Capturer**
+  - **Focus:** Extension / DOM Scripting
+  - **Description:** Implement script in extension content scripts to listen to DOM mutations on YouTube's live caption containers (or use Web Speech API loopback tab audio). Compile parsed words into sentences and forward them via WebSocket.
+- [ ] **[Task 6.4] Injected UI Alert Overlay / Sidebar panel**
+  - **Focus:** Extension / UX
+  - **Description:** Implement a browser sidebar panel (using Side Panel API) or injected DOM overlay to list live verification badges (showing consistency vs contradiction alerts) directly beside the broadcast player.
