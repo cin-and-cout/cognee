@@ -21,7 +21,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
     *   [x] Task 1.2: Cognee custom Pydantic schemas (`app/schemas.py`) and a mock corpus of 59 historical statements ([data/historical_claims.json](file:///home/ani/cognee/data/historical_claims.json)).
     *   [x] Task 1.3: Historical data ingestion script using Cognee and database reset setup.
-*   **Next Priority:** Task 2.1 (WebSocket Live-Feed Simulator).
+    *   [x] Task 2.1: WebSocket Live-Feed Simulator streaming speech sentences at a configurable interval.
+*   **Next Priority:** Task 2.2 (Structured LLM Claim Extractor).
 
 ---
 
@@ -67,7 +68,7 @@ If you are picking up this project, please follow these instructions:
   - **Verification:** Run `python ingest_historical_data.py` and inspect SQLite file.
 
 ### Milestone 2: Simulated Stream & Claim Extraction (Must Have)
-- [ ] **[Task 2.1] WebSocket Live-Feed Simulator**
+- [x] **[Task 2.1] WebSocket Live-Feed Simulator**
   - **Issue Link:** #4
   - **Focus:** API / WebSockets
   - **Verification:** Run `python -m pytest tests/test_websocket_stream.py`.
