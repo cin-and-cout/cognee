@@ -11,6 +11,7 @@ dist/
 downloads/
 eggs/
 .eggs/
+.python-version
 lib/
 lib64/
 parts/

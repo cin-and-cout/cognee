@@ -121,19 +121,19 @@ If you are picking up this project, please follow these instructions:
   - **Focus:** QA / Documentation
   - **Verification:** Run `poetry run pytest --cov=app` to confirm 80%+ coverage.
 
-### Milestone 6: Browser Extension & Live Streaming Integration (Could Have)
+### Milestone 6: Browser Side Panel & Live Streaming Integration (Could Have)
 - [x] **[Task 6.1] Chrome Extension Scaffolding**
   - **Focus:** Extension / Scaffolding
-  - **Description:** Initialize `app/extension/` directory with a standard `manifest.json` (v3) specifying permissions for activeTab and sidePanel. Create a glassmorphic connection popup (`popup.html`/`popup.js`) and background worker skeleton.
-- [ ] **[Task 6.2] WebSocket Input Stream Integration**
+  - **Description:** Initialize `app/extension/` directory with a standard `manifest.json` (v3) specifying permissions for activeTab and sidePanel. Create a connection popup (`popup.html`/`popup.js`) and background worker skeleton.
+- [ ] **[Task 6.2] Remove Simulator Mocking & Refactor WebSocket Route**
   - **Focus:** Backend / API
-  - **Description:** Refactor the WebSocket route `/ws/live-speech` in `app/api/websocket.py` to allow incoming message payload payloads from client streams. Pass received sentences to the unified orchestrator to perform live comparison checks and broadcast resulting verdicts.
-- [ ] **[Task 6.3] Live DOM Caption Scraper & Web Audio Capturer**
+  - **Description:** Decommission the mock speech simulator. Refactor `app/api/websocket.py` to wait for live input from the extension, pass received sentences to the claim comparison engine, and return structured JSON verdicts/alerts back to the extension client.
+- [ ] **[Task 6.3] Chrome Side Panel UI & Neobrutalist Alerts**
+  - **Focus:** Extension / Side Panel
+  - **Description:** Add `sidepanel.html` and `sidepanel.js` to `app/extension/` and register them in `manifest.json`. Implement a Neobrutalist UI showing live transcript bubbles and high-visibility alert cards when inconsistencies are detected.
+- [ ] **[Task 6.4] Live DOM Caption Scraper & Web Audio Capturer Integration**
   - **Focus:** Extension / DOM Scripting
-  - **Description:** Implement script in extension content scripts to listen to DOM mutations on YouTube's live caption containers (or use Web Speech API loopback tab audio). Compile parsed words into sentences and forward them via WebSocket.
-- [ ] **[Task 6.4] Injected UI Alert Overlay / Sidebar panel**
-  - **Focus:** Extension / UX
-  - **Description:** Implement a browser sidebar panel (using Side Panel API) or injected DOM overlay to list live verification badges (showing consistency vs contradiction alerts) directly beside the broadcast player.
-- [ ] **[Task 6.5] Neobrutalism UI Redesign**
-  - **Focus:** Frontend / Styling
-  - **Description:** Redesign the entire Web Dashboard UI and the browser extension interface in a Neobrutalism design language (e.g., using heavy solid borders, sharp offset box-shadows, bold retro typography, high contrast primaries, and asymmetric structures).
+  - **Description:** Hook up `content.js` to YouTube Live caption overlays, parse caption mutations, group words into sentences, and stream them to the background script.
+- [ ] **[Task 6.5] Decommission Old Web Dashboard & Auto-Open Scripting**
+  - **Focus:** Cleanup
+  - **Description:** Remove the old FastAPI HTML template serving, clean up `Makefile` commands to stop executing browser auto-opens, and ensure the backend serves exclusively as a headless WebSocket/HTTP API.
