@@ -133,3 +133,6 @@ If you are picking up this project, please follow these instructions:
 - [ ] **[Task 6.4] Injected UI Alert Overlay / Sidebar panel**
   - **Focus:** Extension / UX
   - **Description:** Implement a browser sidebar panel (using Side Panel API) or injected DOM overlay to list live verification badges (showing consistency vs contradiction alerts) directly beside the broadcast player.
+- [ ] **[Task 6.5] Neobrutalism UI Redesign**
+  - **Focus:** Frontend / Styling
+  - **Description:** Redesign the entire Web Dashboard UI and the browser extension interface in a Neobrutalism design language (e.g., using heavy solid borders, sharp offset box-shadows, bold retro typography, high contrast primaries, and asymmetric structures).
