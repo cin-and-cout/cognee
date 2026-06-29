@@ -36,7 +36,7 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 6.3: Chrome Side Panel UI & Neobrutalist Alerts.
     *   [x] Task 6.4: Live DOM Caption Scraper & Web Audio Capturer Integration.
     *   [x] Task 6.5: Decommission Old Web Dashboard & Auto-Open Scripting.
-*   **Next Priority:** None (All milestone tasks completed).
+*   **Next Priority:** Task 7.1 (Configure Gemini LLM & Embedding Settings).
 
 ---
 
@@ -141,3 +141,14 @@ If you are picking up this project, please follow these instructions:
 - [x] **[Task 6.5] Decommission Old Web Dashboard & Auto-Open Scripting**
   - **Focus:** Cleanup
   - **Description:** Remove the old FastAPI HTML template serving, clean up `Makefile` commands to stop executing browser auto-opens, and ensure the backend serves exclusively as a headless WebSocket/HTTP API.
+
+### Milestone 7: Multi-LLM Provider Support (Gemini & Groq)
+- [ ] **[Task 7.1] Configure Gemini LLM & Embedding Settings**
+  - **Focus:** Infrastructure / LLM
+  - **Description:** Add support for Google Gemini LLM and Embedding models (`LLM_PROVIDER=gemini`, `LLM_MODEL=gemini/gemini-1.5-flash`, `EMBEDDING_PROVIDER=gemini`, `EMBEDDING_MODEL=gemini/text-embedding-004`). Update `.env.template` and verify structured output extraction.
+- [ ] **[Task 7.2] Configure Groq LLM Settings**
+  - **Focus:** Infrastructure / LLM
+  - **Description:** Add support for Groq LLM model (`LLM_PROVIDER=groq`, `LLM_MODEL=groq/llama-3.3-70b-versatile`). Update `.env.template` and verify compatibility with structured output schemas.
+- [ ] **[Task 7.3] Fallback Logic & Documentation**
+  - **Focus:** Infrastructure / LLM
+  - **Description:** Implement verification checks during startup, validate compatibility of JSON schema extractions across all configured providers, and update `README.md` with instructions on API key configuration.
