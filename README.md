@@ -39,7 +39,19 @@ Ensure Python 3.10+ is installed on your system.
 
 ## Running the Application
 
-### 1. Ingest Historical Data
+You can manage the application lifecycle using the provided `Makefile` shortcuts:
+
+*   **Start & Open App**: `make start` (automatically frees port 8000, starts the server, and opens the dashboard in your browser. Press `Ctrl+C` to gracefully shut down the app).
+*   **Free Ports**: `make clean` (forcibly kills any processes running on port 8000).
+*   **Ingest Database**: `make ingest`
+*   **Run Tests**: `make test`
+*   **Lint Code**: `make lint`
+
+### Manual Execution
+
+If you prefer to run components manually, follow these steps:
+
+#### 1. Ingest Historical Data
 Before tracking statements, populate the temporal graph database with the politician's historical claims (e.g. from 2024 to early 2026):
 ```bash
 python ingest_historical_data.py

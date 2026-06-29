@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `master`
+*   **Current Branch:** `feature/makefile`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -30,6 +30,7 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 4.2: Real-time Dashboard UI.
     *   [x] Task 5.1: Demo Verdict Cache System.
     *   [x] Task 5.2: Code Polish, Testing, and Documentation.
+    *   [x] Added Makefile for starting, stopping, cleaning up ports, and testing.
 *   **Next Priority:** None (All milestone tasks completed).
 
 ---
