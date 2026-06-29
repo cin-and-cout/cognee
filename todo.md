@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `feature/makefile`
+*   **Current Branch:** `master`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
