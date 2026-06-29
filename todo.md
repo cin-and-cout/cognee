@@ -33,7 +33,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Added Makefile for starting, stopping, cleaning up ports, and testing.
     *   [x] Task 6.1: Chrome Extension Scaffolding.
     *   [x] Task 6.2: Remove Simulator Mocking & Refactor WebSocket Route.
-*   **Next Priority:** Task 6.3 (Chrome Side Panel UI & Neobrutalist Alerts).
+    *   [x] Task 6.3: Chrome Side Panel UI & Neobrutalist Alerts.
+*   **Next Priority:** Task 6.4 (Live DOM Caption Scraper & Web Audio Capturer Integration).
 
 ---
 
@@ -129,7 +130,7 @@ If you are picking up this project, please follow these instructions:
 - [x] **[Task 6.2] Remove Simulator Mocking & Refactor WebSocket Route**
   - **Focus:** Backend / API
   - **Description:** Decommission the mock speech simulator. Refactor `app/api/websocket.py` to wait for live input from the extension, pass received sentences to the claim comparison engine, and return structured JSON verdicts/alerts back to the extension client.
-- [ ] **[Task 6.3] Chrome Side Panel UI & Neobrutalist Alerts**
+- [x] **[Task 6.3] Chrome Side Panel UI & Neobrutalist Alerts**
   - **Focus:** Extension / Side Panel
   - **Description:** Add `sidepanel.html` and `sidepanel.js` to `app/extension/` and register them in `manifest.json`. Implement a Neobrutalist UI showing live transcript bubbles and high-visibility alert cards when inconsistencies are detected.
 - [ ] **[Task 6.4] Live DOM Caption Scraper & Web Audio Capturer Integration**

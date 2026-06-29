@@ -1,6 +1,14 @@
 let socket = null;
 let reconnectTimer = null;
 
+// Ensure side panel opens when the extension icon is clicked
+chrome.runtime.onInstalled.addListener(() => {
+  if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+      .catch((error) => console.error("Error setting panel behavior:", error));
+  }
+});
+
 // Listen for messages from popup or content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "CONNECT") {
@@ -26,7 +34,34 @@ function connectWebSocket(url) {
 
     socket.onmessage = (event) => {
       console.log("Message from server: ", event.data);
-      // Handle any real-time verdicts pushed down by backend if needed
+      try {
+        const data = JSON.parse(event.data);
+        if (data.text) {
+          chrome.storage.local.get("logs", (store) => {
+            const logs = store.logs || [];
+            // Find existing log entry to attach the verdict/report
+            const existingLog = logs.find((l) => l.text === data.text);
+            if (existingLog) {
+              existingLog.report = data.report;
+            } else {
+              logs.push({
+                timestamp: Date.now(),
+                text: data.text,
+                report: data.report
+              });
+            }
+            // Cap history to 50 items
+            if (logs.length > 50) {
+              logs.shift();
+            }
+            chrome.storage.local.set({ logs }, () => {
+              chrome.runtime.sendMessage({ action: "NEW_LOG" });
+            });
+          });
+        }
+      } catch (err) {
+        console.error("Error parsing WebSocket message:", err);
+      }
     };
 
     socket.onerror = (error) => {
@@ -64,7 +99,6 @@ function handleCapturedTranscript(text) {
 
   // Send to backend via WebSocket if connected
   if (socket && socket.readyState === WebSocket.OPEN) {
-    // Wrap as a JSON payload or string representing the speech sentence
     const payload = JSON.stringify({ sentence: cleanText });
     socket.send(payload);
     console.log("Sent sentence to backend:", cleanText);
@@ -75,17 +109,20 @@ function handleCapturedTranscript(text) {
   // Record log locally
   chrome.storage.local.get("logs", (data) => {
     const logs = data.logs || [];
-    logs.push({
-      timestamp: Date.now(),
-      text: cleanText
-    });
-    // Limit logs list length to 50
-    if (logs.length > 50) {
-      logs.shift();
+    // Only add if not already present
+    if (!logs.some((l) => l.text === cleanText)) {
+      logs.push({
+        timestamp: Date.now(),
+        text: cleanText,
+        report: null
+      });
+      if (logs.length > 50) {
+        logs.shift();
+      }
+      chrome.storage.local.set({ logs }, () => {
+        chrome.runtime.sendMessage({ action: "NEW_LOG" });
+      });
     }
-    chrome.storage.local.set({ logs }, () => {
-      // Notify popup to refresh logs view
-      chrome.runtime.sendMessage({ action: "NEW_LOG" });
-    });
   });
 }
+
