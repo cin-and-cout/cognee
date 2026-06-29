@@ -33,11 +33,24 @@ async def websocket_live_speech(websocket: WebSocket, delay: float = 2.5):
         with open(SPEECH_FILE_PATH, "r") as f:
             lines = [line.strip() for line in f if line.strip()]
 
+        from app.services.orchestrator import process_incoming_sentence
+
         for index, line in enumerate(lines):
+            report = await process_incoming_sentence(
+                text=line,
+                politician_name="Governor Alexis Vance",
+                claim_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                politician_party="Progressive Coalition",
+            )
             payload = {
                 "sentence_index": index,
                 "text": line,
-                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "timestamp": (
+                    datetime.now(timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z")
+                ),
+                "report": report,
             }
             await websocket.send_json(payload)
             await asyncio.sleep(delay)
