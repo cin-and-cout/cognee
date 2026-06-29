@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `master`
+*   **Current Branch:** `feature/extension-scaffolding`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -31,7 +31,8 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 5.1: Demo Verdict Cache System.
     *   [x] Task 5.2: Code Polish, Testing, and Documentation.
     *   [x] Added Makefile for starting, stopping, cleaning up ports, and testing.
-*   **Next Priority:** Milestone 6: Browser Extension & Live Streaming Integration.
+    *   [x] Task 6.1: Chrome Extension Scaffolding.
+*   **Next Priority:** Task 6.2 (WebSocket Input Stream Integration).
 
 ---
 
@@ -121,7 +122,7 @@ If you are picking up this project, please follow these instructions:
   - **Verification:** Run `poetry run pytest --cov=app` to confirm 80%+ coverage.
 
 ### Milestone 6: Browser Extension & Live Streaming Integration (Could Have)
-- [ ] **[Task 6.1] Chrome Extension Scaffolding**
+- [x] **[Task 6.1] Chrome Extension Scaffolding**
   - **Focus:** Extension / Scaffolding
   - **Description:** Initialize `app/extension/` directory with a standard `manifest.json` (v3) specifying permissions for activeTab and sidePanel. Create a glassmorphic connection popup (`popup.html`/`popup.js`) and background worker skeleton.
 - [ ] **[Task 6.2] WebSocket Input Stream Integration**
