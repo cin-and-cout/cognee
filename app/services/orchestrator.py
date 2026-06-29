@@ -24,6 +24,13 @@ async def process_incoming_sentence(
       4. Ingests the new claim into the Cognee graph database.
       5. Returns a detailed report of the findings.
     """
+    # Check cache first for demo stability and speed
+    from app.services.cache import get_cached_verdict, set_cached_verdict
+
+    cached_report = get_cached_verdict(text)
+    if cached_report:
+        return cached_report
+
     # 1. Extract claim
     new_claim = await extract_claim_from_text(
         text,
@@ -41,7 +48,10 @@ async def process_incoming_sentence(
     latest_historical: Optional[Claim] = None
     for claim in historical_claims:
         if claim.claim_date < new_claim.claim_date:
-            if not latest_historical or claim.claim_date > latest_historical.claim_date:
+            if (
+                not latest_historical
+                or claim.claim_date > latest_historical.claim_date
+            ):
                 latest_historical = claim
 
     # 3. Perform comparison if a prior record exists
@@ -71,7 +81,7 @@ async def process_incoming_sentence(
     await cognee.cognify(temporal_cognify=True)
 
     # 5. Build and return report
-    return {
+    report = {
         "new_claim": {
             "statement": new_claim.statement,
             "claim_date": new_claim.claim_date,
@@ -95,3 +105,8 @@ async def process_incoming_sentence(
         ),
         "verdict": verdict,
     }
+
+    # Save to cache
+    set_cached_verdict(text, report)
+
+    return report
