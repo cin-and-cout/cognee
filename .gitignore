@@ -61,10 +61,7 @@ coverage.xml
 cognee.db
 vector_store/
 neo4j_data/
-.cognee_system/
-.cognee_data/
-
 
 pyrightconfig.json
 .env
-.env.template
+.cognee_system/
