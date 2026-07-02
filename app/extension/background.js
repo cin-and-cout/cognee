@@ -30,8 +30,8 @@ class StreamBuffer {
     this.AVG_WORDS_PER_SENTENCE = 12;
 
     // Timeout bounds (ms)
-    this.MIN_TIMEOUT = 400;
-    this.MAX_TIMEOUT = 2000;
+    this.MIN_TIMEOUT = 800;
+    this.MAX_TIMEOUT = 3000;
 
     // Safety valve
     this.MAX_BUFFER_WORDS = 40;
@@ -39,8 +39,8 @@ class StreamBuffer {
     // Carry-over
     this.CARRY_OVER_WORDS = 3;
 
-    // Deduplication — hash of recently flushed sentences
-    this.recentHashes = [];
+    // Deduplication — recent sentence texts for overlap-aware checks
+    this.recentSentences = [];
     this.DEDUP_WINDOW = 20;
 
     // Common abbreviations that should NOT trigger a sentence split
@@ -238,30 +238,31 @@ class StreamBuffer {
       this.flushTimer = null;
     }
 
-    // Deduplication: simple hash check
-    const hash = this._hashString(trimmed.toLowerCase());
-    if (this.recentHashes.includes(hash)) {
-      console.log("StreamBuffer: Duplicate sentence suppressed:", trimmed);
+    // Deduplication: overlap-aware substring check.
+    // Exact hash matching misses cases where a sentence grows incrementally
+    // (e.g. "IT IS OPEN AND" → "IT IS OPEN AND MARITIME LAWS").
+    // Instead, we keep the raw normalized text and check for containment.
+    const normalized = trimmed.toLowerCase();
+
+    // Suppress if any recent sentence already contains this one (subset)
+    if (this.recentSentences.some((recent) => recent.includes(normalized))) {
+      console.log("StreamBuffer: Subset sentence suppressed:", trimmed);
       return;
     }
-    this.recentHashes.push(hash);
-    if (this.recentHashes.length > this.DEDUP_WINDOW) {
-      this.recentHashes.shift();
+
+    // If this sentence contains a previous one, allow it (it's an extension)
+    // but remove the old shorter entry to keep the window clean
+    this.recentSentences = this.recentSentences.filter(
+      (recent) => !normalized.includes(recent)
+    );
+
+    this.recentSentences.push(normalized);
+    if (this.recentSentences.length > this.DEDUP_WINDOW) {
+      this.recentSentences.shift();
     }
 
     console.log("StreamBuffer: Sentence ready:", trimmed);
     this.onSentenceReady(trimmed);
-  }
-
-  /**
-   * Simple string hash (djb2).
-   */
-  _hashString(str) {
-    let hash = 5381;
-    for (let i = 0; i < str.length; i++) {
-      hash = ((hash << 5) + hash + str.charCodeAt(i)) & 0xffffffff;
-    }
-    return hash.toString(36);
   }
 
   /**
@@ -270,7 +271,7 @@ class StreamBuffer {
   reset() {
     this.buffer = "";
     this.wordTimestamps = [];
-    this.recentHashes = [];
+    this.recentSentences = [];
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
@@ -406,6 +407,13 @@ function handleSegmentedSentence(text) {
   if (!text || !text.trim()) return;
 
   const cleanText = text.trim();
+
+  // Gate: reject sentences shorter than 4 words locally
+  // (mirrors the backend MIN_SENTENCE_WORDS filter)
+  if (cleanText.split(/\s+/).length < 4) {
+    console.log("Locally rejected short sentence:", cleanText);
+    return;
+  }
 
   // Send to backend via WebSocket if connected
   if (socket && socket.readyState === WebSocket.OPEN) {

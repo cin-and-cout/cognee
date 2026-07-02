@@ -1,91 +1,78 @@
 console.log("Live Claim Consistency Tracker content script initialized.");
 
 /**
- * Diff-based YouTube caption stream collector.
+ * Word-level YouTube caption stream collector.
  *
- * Instead of trying to detect sentence boundaries (which is unreliable on
- * auto-generated captions), this script acts as a dumb text stream:
- *   1. Observe .ytp-caption-segment DOM mutations.
- *   2. Diff the current segment array against the previous one.
- *   3. Emit only the *new* text as a CAPTION_CHUNK to the background worker.
+ * Instead of trying to detect sentence boundaries, this script:
+ *   1. Observes .ytp-caption-segment DOM mutations (debounced 150ms).
+ *   2. Flattens all visible caption text into a flat word array.
+ *   3. Diffs word-by-word against the previous snapshot.
+ *   4. Emits only genuinely *new* words as a CAPTION_CHUNK to background.js.
  *
- * Sentence segmentation is handled entirely by the StreamBuffer in background.js.
+ * The 150ms debounce prevents capturing mid-render partial words (e.g. "SECURIT"
+ * instead of "SECURITY") that YouTube writes character-by-character.
+ *
+ * Sentence segmentation is handled by the StreamBuffer in background.js.
  */
 
 // --- State ---
-let previousSegments = [];   // text content of each .ytp-caption-segment last observation
-let recentChunks = [];       // rolling window for dedup (last N emitted chunks)
+let previousWords = [];      // flat word array from last observation
+let recentChunks = [];       // rolling dedup window (last N emitted chunks)
 const DEDUP_WINDOW = 10;
+let debounceTimer = null;    // MutationObserver debounce timer
 
-// --- Core diff algorithm ---
+// --- Core diff algorithm (word-level) ---
 
 /**
- * Compute text that is genuinely new between two arrays of caption segment strings.
+ * Find genuinely new words by suffix/prefix overlap between two word arrays.
  *
- * YouTube's caption renderer works in one of three modes:
- *   (a) Append: keeps existing segments, adds new ones at the end.
- *   (b) Replace: clears all segments, shows a completely new set.
- *   (c) Correct: modifies an existing segment (auto-caption correction).
+ * YouTube extends captions in-place — a segment like "THE ECONOMY HAS" becomes
+ * "THE ECONOMY HAS BEEN GROWING". Segment-level comparison sees these as
+ * completely different strings. Word-level comparison correctly finds the overlap
+ * and emits only ["BEEN", "GROWING"].
  *
- * The algorithm finds the longest suffix of `prev` that matches a prefix of `curr`,
- * then returns only the segments in `curr` after that matched region.
+ * Algorithm: find the longest suffix of `prev` that matches a prefix of `curr`,
+ * then return only the words after that overlap.
  *
  * Example:
- *   prev = ["the economy has", "been growing"]
- *   curr = ["been growing", "at a rate of"]
- *   → matched suffix/prefix: ["been growing"]
- *   → new segments: ["at a rate of"]
- *   → returns "at a rate of"
+ *   prev = ["THE", "ECONOMY", "HAS", "BEEN", "GROWING"]
+ *   curr = ["BEEN", "GROWING", "AT", "A", "RATE", "OF"]
+ *   → overlap: ["BEEN", "GROWING"]
+ *   → returns: ["AT", "A", "RATE", "OF"]
  */
-function computeNewText(prev, curr) {
+function computeNewWords(prev, curr) {
   if (prev.length === 0) {
-    // First observation — everything is new
-    return curr.join(" ");
+    return curr;
   }
-
   if (curr.length === 0) {
-    return "";
+    return [];
   }
 
-  // Find the longest suffix of prev that matches a prefix of curr.
-  // Start with the longest possible overlap and shrink.
+  // Find the longest suffix of prev matching a prefix of curr
   const maxOverlap = Math.min(prev.length, curr.length);
-  let bestOverlap = 0;
 
   for (let overlapLen = maxOverlap; overlapLen >= 1; overlapLen--) {
-    const prevSuffix = prev.slice(prev.length - overlapLen);
-    const currPrefix = curr.slice(0, overlapLen);
-
     let matches = true;
     for (let i = 0; i < overlapLen; i++) {
-      if (prevSuffix[i] !== currPrefix[i]) {
+      if (prev[prev.length - overlapLen + i] !== curr[i]) {
         matches = false;
         break;
       }
     }
-
     if (matches) {
-      bestOverlap = overlapLen;
-      break;
+      return curr.slice(overlapLen);
     }
   }
 
-  if (bestOverlap > 0) {
-    // Return only the segments after the overlapping prefix
-    const newSegments = curr.slice(bestOverlap);
-    return newSegments.join(" ");
-  }
-
-  // No overlap found — YouTube did a full caption window replacement.
-  // Treat all of curr as new text.
-  return curr.join(" ");
+  // No overlap — YouTube did a full caption window replacement
+  return curr;
 }
 
 // --- Deduplication ---
 
 /**
- * Check if this chunk was recently emitted (within the rolling window).
- * Returns true if it's a duplicate.
+ * Check if this chunk text was recently emitted.
+ * Returns true if duplicate.
  */
 function isDuplicate(text) {
   const normalized = text.toLowerCase().trim();
@@ -99,42 +86,61 @@ function isDuplicate(text) {
   return false;
 }
 
-// --- DOM Observer ---
+// --- Debounced caption processing ---
 
-const observer = new MutationObserver(() => {
+/**
+ * Read the current caption DOM state, diff against previous, and emit new words.
+ * Called 150ms after the last MutationObserver event (debounced).
+ */
+function processCaptions() {
   const captionElements = document.querySelectorAll(".ytp-caption-segment");
   if (!captionElements || captionElements.length === 0) {
-    // Caption window was cleared — reset state so the next render is treated as new
-    if (previousSegments.length > 0) {
-      previousSegments = [];
+    // Caption window cleared — reset so next render is treated as new
+    if (previousWords.length > 0) {
+      previousWords = [];
     }
     return;
   }
 
-  // Snapshot current caption segments
-  const currentSegments = Array.from(captionElements)
+  // Flatten all segments into a single word array
+  const fullText = Array.from(captionElements)
     .map((el) => el.textContent.trim())
-    .filter((t) => t.length > 0);
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 
-  // Compute diff
-  const newText = computeNewText(previousSegments, currentSegments);
-  previousSegments = [...currentSegments];
+  const currentWords = fullText ? fullText.split(" ") : [];
 
-  // Clean and validate
-  const cleaned = newText.replace(/\s+/g, " ").trim();
-  if (!cleaned) return;
+  // Word-level diff
+  const newWords = computeNewWords(previousWords, currentWords);
+  previousWords = [...currentWords];
+
+  const newText = newWords.join(" ").trim();
+  if (!newText) return;
 
   // Deduplicate
-  if (isDuplicate(cleaned)) {
+  if (isDuplicate(newText)) {
     return;
   }
 
-  // Emit raw chunk to background worker
-  console.log("Caption chunk:", cleaned);
+  // Emit raw word chunk to background worker
+  console.log("Caption chunk:", newText);
   chrome.runtime.sendMessage({
     action: "CAPTION_CHUNK",
-    text: cleaned,
+    text: newText,
   });
+}
+
+// --- DOM Observer (debounced) ---
+
+const observer = new MutationObserver(() => {
+  // Debounce: wait 150ms after the last mutation before reading the DOM.
+  // YouTube renders words character-by-character; this ensures we capture
+  // complete words rather than partial renders like "SECURIT".
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
+  debounceTimer = setTimeout(processCaptions, 150);
 });
 
 // --- Initialization ---
