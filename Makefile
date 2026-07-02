@@ -6,17 +6,17 @@ start:
 	@echo "Ensuring port 8000 is free..."
 	@fuser -k 8000/tcp || true
 	@echo "Starting FastAPI server..."
-	@source .venv/bin/activate && uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+	uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 clean:
 	@echo "Freeing port 8000..."
 	@fuser -k 8000/tcp || true
 
 ingest:
-	@source .venv/bin/activate && python ingest_historical_data.py
+	python ingest_historical_data.py
 
 test:
-	@source .venv/bin/activate && PYTHONPATH=. pytest -p no:warnings
+	PYTHONPATH=. pytest -p no:warnings
 
 lint:
-	@source .venv/bin/activate && ruff check
+	ruff check

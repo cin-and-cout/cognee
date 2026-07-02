@@ -1,15 +1,13 @@
+import app.env_init  # noqa: F401
 import asyncio
 import json
 import os
 
 import cognee
 from cognee.tasks.storage import add_data_points
-from dotenv import load_dotenv
 
 from app.schemas import Claim, Politician, Topic
 
-# Load environment variables (such as OPENAI_API_KEY) from .env
-load_dotenv()
 
 
 async def ingest_data(file_path: str = "data/historical_claims.json"):
@@ -73,6 +71,7 @@ async def ingest_data(file_path: str = "data/historical_claims.json"):
     await add_data_points(data_points)
 
     print("Running temporal cognify pipeline (graph construction & indexing)...")
+    await cognee.add("historical_claims", dataset_name="default_dataset")
     await cognee.cognify(temporal_cognify=True)
     print("Ingestion pipeline finished successfully!")
 

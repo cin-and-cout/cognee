@@ -1,3 +1,4 @@
+import app.env_init  # noqa: F401
 from fastapi import FastAPI
 
 from app.api.websocket import router as ws_router

@@ -1,5 +1,8 @@
 import asyncio
+import logging
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 import cognee
 from cognee.tasks.storage import add_data_points
@@ -76,10 +79,10 @@ async def process_incoming_sentence(
     async def run_ingestion():
         try:
             await add_data_points([new_claim.politician, new_claim.topic, new_claim])
+            await cognee.add("historical_claims", dataset_name="default_dataset")
             await cognee.cognify(temporal_cognify=True)
         except Exception:
-            # Silence background errors to prevent API disruption
-            pass
+            logger.exception("Background claim ingestion failed — data point was NOT persisted to the graph")
 
     asyncio.create_task(run_ingestion())
     # Yield control to event loop so background task can start executing

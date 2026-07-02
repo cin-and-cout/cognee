@@ -11,9 +11,11 @@ from app.services.orchestrator import process_incoming_sentence
 @patch("app.services.orchestrator.get_historical_claims", new_callable=AsyncMock)
 @patch("app.services.orchestrator.calculate_numeric_diff")
 @patch("app.services.orchestrator.add_data_points", new_callable=AsyncMock)
+@patch("app.services.orchestrator.cognee.add", new_callable=AsyncMock)
 @patch("app.services.orchestrator.cognee.cognify", new_callable=AsyncMock)
 async def test_orchestrator_numeric_flow(
     mock_cognify,
+    mock_add,
     mock_add_data_points,
     mock_calc_diff,
     mock_get_hist,
@@ -76,6 +78,7 @@ async def test_orchestrator_numeric_flow(
     mock_get_hist.assert_called_once_with("Inflation")
     mock_calc_diff.assert_called_once_with(hist_claim, new_claim)
     mock_add_data_points.assert_called_once()
+    mock_add.assert_called_once_with("historical_claims", dataset_name="default_dataset")
     mock_cognify.assert_called_once()
 
 
@@ -84,9 +87,11 @@ async def test_orchestrator_numeric_flow(
 @patch("app.services.orchestrator.get_historical_claims", new_callable=AsyncMock)
 @patch("app.services.orchestrator.classify_nli_contradiction", new_callable=AsyncMock)
 @patch("app.services.orchestrator.add_data_points", new_callable=AsyncMock)
+@patch("app.services.orchestrator.cognee.add", new_callable=AsyncMock)
 @patch("app.services.orchestrator.cognee.cognify", new_callable=AsyncMock)
 async def test_orchestrator_qualitative_flow(
     mock_cognify,
+    mock_add,
     mock_add_data_points,
     mock_nli,
     mock_get_hist,
@@ -141,4 +146,5 @@ async def test_orchestrator_qualitative_flow(
     mock_get_hist.assert_called_once_with("Transit")
     mock_nli.assert_called_once_with(new_claim, hist_claim)
     mock_add_data_points.assert_called_once()
+    mock_add.assert_called_once_with("historical_claims", dataset_name="default_dataset")
     mock_cognify.assert_called_once()

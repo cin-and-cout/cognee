@@ -1,7 +1,8 @@
+from datetime import date
 from typing import Any, Optional
 
 from cognee.infrastructure.engine import DataPoint
-from pydantic import SkipValidation
+from pydantic import SkipValidation, field_validator
 
 
 class Politician(DataPoint):
@@ -41,7 +42,7 @@ class Claim(DataPoint):
     statement: str
     politician: SkipValidation[Any]
     topic: SkipValidation[Any]
-    claim_date: str  # Format: YYYY-MM-DD
+    claim_date: str  # Format: YYYY-MM-DD (validated on input)
     source_link: Optional[str] = None
 
     # Quantitative fields for numeric drift comparison
@@ -53,3 +54,20 @@ class Claim(DataPoint):
     metadata: dict = {
         "index_fields": ["statement", "metric"],
     }
+
+    @field_validator("claim_date", mode="before")
+    @classmethod
+    def validate_claim_date(cls, v: Any) -> str:
+        """
+        Accepts a datetime.date object or an ISO-format string (YYYY-MM-DD).
+        Normalises to a zero-padded YYYY-MM-DD string so comparisons are safe
+        and the value remains JSON-serialisable for Cognee's graph layer.
+        """
+        if isinstance(v, date):
+            return v.isoformat()
+        try:
+            return date.fromisoformat(str(v)).isoformat()
+        except ValueError as exc:
+            raise ValueError(
+                f"claim_date must be a valid YYYY-MM-DD date string, got: {v!r}"
+            ) from exc

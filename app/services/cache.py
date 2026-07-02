@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 from typing import Any, Dict, Optional
 
 CACHE_FILE_PATH = os.path.join(
@@ -45,10 +44,6 @@ def set_cached_verdict(text: str, report: Dict[str, Any]):
     """
     key = text.strip().lower()
     _cache[key] = report
-
-    # Avoid overwriting the production cache when running tests
-    if "pytest" in sys.modules and CACHE_FILE_PATH.endswith("demo_cache.json"):
-        return
 
     try:
         os.makedirs(os.path.dirname(CACHE_FILE_PATH), exist_ok=True)

@@ -1,3 +1,4 @@
+import app.env_init  # noqa: F401
 import argparse
 import asyncio
 import os
