@@ -152,3 +152,17 @@ If you are picking up this project, please follow these instructions:
 - [ ] **[Task 7.3] Fallback Logic & Documentation**
   - **Focus:** Infrastructure / LLM
   - **Description:** Implement verification checks during startup, validate compatibility of JSON schema extractions across all configured providers, and update `README.md` with instructions on API key configuration.
+
+### Milestone 8: Robust Sentence Extraction (Must Have)
+- [x] **[Task 8.1] Content Script — Diff-Based Caption Stream Collector**
+  - **Focus:** Extension / DOM Scripting
+  - **Description:** Rewrite `content.js` to remove all sentence-detection logic (punctuation regex, 800ms timeout). Replace with a diff-based text extractor that uses suffix-matching to emit only *new words* from YouTube caption DOM mutations. Send raw `CAPTION_CHUNK` messages to the background script instead of `TRANSCRIPT_CAPTURED`. Track a rolling window of previously-seen segments to handle caption corrections and overlapping re-renders.
+  - **Verification:** Load a fast-paced YouTube video with auto-captions; confirm console logs show clean, non-duplicated word chunks arriving in real-time without sentence-level grouping.
+- [x] **[Task 8.2] Background Script — StreamBuffer & Sentence Segmenter**
+  - **Focus:** Extension / Background Worker
+  - **Description:** Add a `StreamBuffer` class to `background.js` that accumulates incoming `CAPTION_CHUNK` text and segments it into sentences using three strategies: (A) Rule-based fast path — split on `.` `!` `?` when preceded by ≥4 words, with abbreviation/acronym guards; (B) Adaptive timeout — dynamically compute flush delay from rolling words-per-second rate (clamped 400ms–2000ms); (C) Max-buffer safety valve — force-flush at 40 words. Retain last 3 words as carry-over for context continuity. Add hash-based deduplication before sending to WebSocket.
+  - **Verification:** Test against both fast-paced (news debate) and slow-paced (lecture) YouTube videos. Confirm sentences are neither merged nor prematurely split. Verify adaptive timeout adjusts to speaking pace.
+- [x] **[Task 8.3] Backend Defensive Filters & Deduplication**
+  - **Focus:** Backend / API
+  - **Description:** Update `app/api/websocket.py` to add a minimum sentence length filter (reject <4 words) and a server-side deduplication window (hash set of last 20 processed sentences). Prevents fragments and duplicate LLM processing from edge cases that slip past the extension-side logic.
+  - **Verification:** Send intentional fragment and duplicate payloads via WebSocket client; confirm they are rejected and not forwarded to the orchestrator.
