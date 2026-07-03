@@ -13,8 +13,13 @@ let reconnectTimer = null;
  *   B) Adaptive timeout based on rolling words-per-second
  *   C) Max-buffer safety valve (40 words)
  *
- * After flushing a sentence, the last 3 words are retained as carry-over
- * to provide context continuity.
+ * Deduplication uses a Global Word Ledger — an append-only list of every
+ * word ever emitted (capped at 200). Before emitting a sentence, its prefix
+ * is aligned against the ledger's suffix to strip already-emitted words.
+ * This eliminates all repetition without heuristic thresholds.
+ *
+ * A 5-second heartbeat timer ensures the buffer is drained even when no
+ * new chunks arrive (e.g., video paused or segment ended).
  */
 class StreamBuffer {
   constructor(onSentenceReady) {
@@ -36,12 +41,13 @@ class StreamBuffer {
     // Safety valve
     this.MAX_BUFFER_WORDS = 40;
 
-    // Carry-over
-    this.CARRY_OVER_WORDS = 3;
+    // Global Word Ledger — every word ever emitted, for overlap stripping
+    this.emittedWords = [];
+    this.MAX_LEDGER_WORDS = 200;
 
-    // Deduplication — recent sentence texts for overlap-aware checks
-    this.recentSentences = [];
-    this.DEDUP_WINDOW = 20;
+    // Heartbeat flush — drain stale buffer when no new chunks arrive
+    this.heartbeatTimer = null;
+    this.HEARTBEAT_MS = 5000;
 
     // Common abbreviations that should NOT trigger a sentence split
     this.ABBREVIATIONS = new Set([
@@ -80,6 +86,9 @@ class StreamBuffer {
 
     // Strategy B: Reset adaptive timeout
     this._resetAdaptiveTimeout();
+
+    // Reset heartbeat — we just received data, so push back the drain timer
+    this._resetHeartbeat();
   }
 
   /**
@@ -226,7 +235,52 @@ class StreamBuffer {
   }
 
   /**
-   * Flush a complete sentence. Applies carry-over and deduplication.
+   * Strip overlapping prefix from a sentence using the Global Word Ledger.
+   *
+   * Finds the longest prefix of `sentenceWords` that matches a suffix of
+   * `this.emittedWords`, and returns only the non-overlapping tail.
+   *
+   * Example:
+   *   emittedWords = [..., "holder", "of", "the", "time", "Spider-Man", "3's", "60", "million"]
+   *   sentenceWords = ["of", "the", "time", "Spider-Man", "3's", "60", "million", "dollars", "in", "sales"]
+   *   → overlap length: 7 ("of the time Spider-Man 3's 60 million")
+   *   → returns: ["dollars", "in", "sales"]
+   */
+  _stripOverlapWithLedger(sentenceWords) {
+    if (this.emittedWords.length === 0 || sentenceWords.length === 0) {
+      return sentenceWords;
+    }
+
+    // Find the longest prefix of sentenceWords that matches a suffix of emittedWords
+    const maxOverlap = Math.min(this.emittedWords.length, sentenceWords.length);
+
+    for (let overlapLen = maxOverlap; overlapLen >= 1; overlapLen--) {
+      let matches = true;
+      for (let i = 0; i < overlapLen; i++) {
+        const ledgerWord = this.emittedWords[this.emittedWords.length - overlapLen + i];
+        const sentenceWord = sentenceWords[i];
+        // Case-insensitive comparison for robustness
+        if (ledgerWord.toLowerCase() !== sentenceWord.toLowerCase()) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) {
+        console.log(
+          `StreamBuffer: Stripped ${overlapLen} overlapping words from sentence prefix`
+        );
+        return sentenceWords.slice(overlapLen);
+      }
+    }
+
+    // No overlap found
+    return sentenceWords;
+  }
+
+  /**
+   * Flush a complete sentence. Uses the Global Word Ledger to strip any
+   * overlapping prefix (words already emitted), then appends the new words
+   * to the ledger.
    */
   _flushSentence(sentence) {
     const trimmed = sentence.trim();
@@ -238,31 +292,50 @@ class StreamBuffer {
       this.flushTimer = null;
     }
 
-    // Deduplication: overlap-aware substring check.
-    // Exact hash matching misses cases where a sentence grows incrementally
-    // (e.g. "IT IS OPEN AND" → "IT IS OPEN AND MARITIME LAWS").
-    // Instead, we keep the raw normalized text and check for containment.
-    const normalized = trimmed.toLowerCase();
+    // Tokenize and strip overlap with the Global Word Ledger
+    const sentenceWords = trimmed.split(/\s+/);
+    const newWords = this._stripOverlapWithLedger(sentenceWords);
 
-    // Suppress if any recent sentence already contains this one (subset)
-    if (this.recentSentences.some((recent) => recent.includes(normalized))) {
-      console.log("StreamBuffer: Subset sentence suppressed:", trimmed);
+    // If all words were already emitted, suppress entirely
+    if (newWords.length === 0) {
+      console.log("StreamBuffer: Fully overlapping sentence suppressed:", trimmed);
       return;
     }
 
-    // If this sentence contains a previous one, allow it (it's an extension)
-    // but remove the old shorter entry to keep the window clean
-    this.recentSentences = this.recentSentences.filter(
-      (recent) => !normalized.includes(recent)
-    );
+    const dedupedSentence = newWords.join(" ");
 
-    this.recentSentences.push(normalized);
-    if (this.recentSentences.length > this.DEDUP_WINDOW) {
-      this.recentSentences.shift();
+    // Append new words to the ledger
+    this.emittedWords.push(...newWords);
+
+    // Cap ledger size to prevent unbounded memory growth
+    if (this.emittedWords.length > this.MAX_LEDGER_WORDS) {
+      this.emittedWords = this.emittedWords.slice(
+        this.emittedWords.length - this.MAX_LEDGER_WORDS
+      );
     }
 
-    console.log("StreamBuffer: Sentence ready:", trimmed);
-    this.onSentenceReady(trimmed);
+    console.log("StreamBuffer: Sentence ready:", dedupedSentence);
+    this.onSentenceReady(dedupedSentence);
+  }
+
+  /**
+   * Heartbeat timer — flushes stale buffer content when no new chunks
+   * arrive within HEARTBEAT_MS. Handles edge cases like video pausing
+   * mid-sentence or a segment ending without triggering the adaptive timeout.
+   */
+  _resetHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+
+    this.heartbeatTimer = setTimeout(() => {
+      if (this.buffer.trim()) {
+        console.log("StreamBuffer: Heartbeat flush — draining stale buffer");
+        this._flushSentence(this.buffer.trim());
+        this.buffer = "";
+      }
+    }, this.HEARTBEAT_MS);
   }
 
   /**
@@ -271,10 +344,14 @@ class StreamBuffer {
   reset() {
     this.buffer = "";
     this.wordTimestamps = [];
-    this.recentSentences = [];
+    this.emittedWords = [];
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
+    }
+    if (this.heartbeatTimer) {
+      clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = null;
     }
   }
 }

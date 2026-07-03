@@ -166,3 +166,13 @@ If you are picking up this project, please follow these instructions:
   - **Focus:** Backend / API
   - **Description:** Update `app/api/websocket.py` to add a minimum sentence length filter (reject <4 words) and a server-side deduplication window (hash set of last 20 processed sentences). Prevents fragments and duplicate LLM processing from edge cases that slip past the extension-side logic.
   - **Verification:** Send intentional fragment and duplicate payloads via WebSocket client; confirm they are rejected and not forwarded to the orchestrator.
+
+### Milestone 9: Global Word Ledger — Eliminate Sentence Repetition (Must Have)
+- [x] **[Task 9.1] StreamBuffer — Global Word Ledger Integration**
+  - **Focus:** Extension / Background Worker
+  - **Description:** Add a `emittedWords` array (capped at 200) to the `StreamBuffer` class in `background.js`. Before flushing any sentence in `_flushSentence()`, tokenize it into words and find the longest prefix that matches a suffix of `emittedWords` using suffix-prefix overlap. Strip the overlapping prefix and emit only the non-overlapping tail. After emitting, append the new words to `emittedWords`. Remove the existing carry-over mechanism (`CARRY_OVER_WORDS`) as it actively re-introduces already-emitted words. Replace the `includes()`-based substring dedup with the ledger-based approach which is strictly more powerful.
+  - **Verification:** Replay the GTA 4 caption stream that exhibited repetition; confirm zero duplicate words/phrases in emitted sentences while all original words are present.
+- [x] **[Task 9.2] Heartbeat Flush — Drain Stale Buffer**
+  - **Focus:** Extension / Background Worker
+  - **Description:** Add a periodic 5-second heartbeat timer to `StreamBuffer` that flushes whatever remains in the buffer if no new chunks have arrived. This handles the edge case where the last words of a video/segment never get flushed because no new chunk arrives to trigger the adaptive timeout. The heartbeat should reset whenever a new chunk arrives.
+  - **Verification:** Pause a YouTube video mid-sentence; confirm the partial buffer is flushed within 5 seconds rather than being lost.
