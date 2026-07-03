@@ -251,10 +251,13 @@ class StreamBuffer {
       return sentenceWords;
     }
 
-    // Find the longest prefix of sentenceWords that matches a suffix of emittedWords
+    // Find the longest prefix of sentenceWords that matches a suffix of emittedWords.
+    // Require at least 2 matching words to avoid false positives on common words
+    // like "the", "a", "is" that could coincidentally appear at both boundaries.
+    const MIN_OVERLAP_WORDS = 2;
     const maxOverlap = Math.min(this.emittedWords.length, sentenceWords.length);
 
-    for (let overlapLen = maxOverlap; overlapLen >= 1; overlapLen--) {
+    for (let overlapLen = maxOverlap; overlapLen >= MIN_OVERLAP_WORDS; overlapLen--) {
       let matches = true;
       for (let i = 0; i < overlapLen; i++) {
         const ledgerWord = this.emittedWords[this.emittedWords.length - overlapLen + i];
@@ -485,12 +488,10 @@ function handleSegmentedSentence(text) {
 
   const cleanText = text.trim();
 
-  // Gate: reject sentences shorter than 4 words locally
-  // (mirrors the backend MIN_SENTENCE_WORDS filter)
-  if (cleanText.split(/\s+/).length < 4) {
-    console.log("Locally rejected short sentence:", cleanText);
-    return;
-  }
+  // NOTE: No minimum word-count filter here. The Global Word Ledger in
+  // StreamBuffer may produce short fragments (1-3 words) after stripping
+  // overlap, and these are legitimate new content that must not be dropped.
+  // The server-side filter in websocket.py handles junk rejection.
 
   // Send to backend via WebSocket if connected
   if (socket && socket.readyState === WebSocket.OPEN) {

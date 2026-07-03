@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Defensive filter constants
-MIN_SENTENCE_WORDS = 4
+# NOTE: Lowered from 4 to 1 because the client-side Global Word Ledger
+# may produce short fragments (1-3 words) after stripping overlap.
+# These are legitimate new content, not junk.
+MIN_SENTENCE_WORDS = 1
 DEDUP_WINDOW_SIZE = 20
 
 
