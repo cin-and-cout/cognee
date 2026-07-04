@@ -39,7 +39,7 @@ async def websocket_live_speech(websocket: WebSocket):
             # Wait for incoming text or json from client (e.g., {"sentence": "..."})
             data = await websocket.receive_json()
             sentence = data.get("sentence", "").strip()
-            speaker = data.get("speaker", "Governor Alexis Vance")
+            speaker = data.get("speaker", "Unknown Speaker")
             speaker_confidence = data.get("speakerConfidence", "low")
             if not sentence:
                 continue
