@@ -315,10 +315,25 @@ class StreamBuffer {
       return sentenceWords;
     }
 
-    const MIN_OVERLAP_WORDS = 2;
+    // Stop words that appear so frequently that a single-word overlap is
+    // almost certainly coincidental rather than a real carry-over.
+    // For ALL other words, a 1-word overlap is treated as genuine repetition.
+    const STOP_WORDS = new Set([
+      "the", "a", "an", "is", "are", "was", "were", "be", "been",
+      "it", "he", "she", "we", "they", "i", "you", "and", "or",
+      "but", "so", "of", "in", "on", "at", "to", "for", "with",
+      "that", "this", "its",
+    ]);
+
     const maxOverlap = Math.min(this.emittedWords.length, sentenceWords.length);
 
-    for (let overlapLen = maxOverlap; overlapLen >= MIN_OVERLAP_WORDS; overlapLen--) {
+    for (let overlapLen = maxOverlap; overlapLen >= 1; overlapLen--) {
+      // For a 1-word overlap, skip if it is a stop word
+      if (overlapLen === 1) {
+        const candidateWord = sentenceWords[0].toLowerCase();
+        if (STOP_WORDS.has(candidateWord)) continue;
+      }
+
       let matches = true;
       for (let i = 0; i < overlapLen; i++) {
         const ledgerWord = this.emittedWords[this.emittedWords.length - overlapLen + i];
@@ -330,7 +345,7 @@ class StreamBuffer {
       }
       if (matches) {
         console.log(
-          `StreamBuffer: Stripped ${overlapLen} overlapping words from sentence prefix`
+          `StreamBuffer: Stripped ${overlapLen} overlapping word(s) from sentence prefix`
         );
         return sentenceWords.slice(overlapLen);
       }
@@ -351,10 +366,16 @@ class StreamBuffer {
     const trimmed = sentence.trim();
     if (!trimmed) return;
 
-    // Cancel any pending pause detection timer
+    // Cancel both timers — prevents a stale heartbeat or pause timer from
+    // processing the same buffer content again after a rule-based or
+    // safety-valve flush has already consumed it.
     if (this.pauseDetectionTimer) {
       clearTimeout(this.pauseDetectionTimer);
       this.pauseDetectionTimer = null;
+    }
+    if (this.heartbeatTimer) {
+      clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = null;
     }
 
     // Tokenize and strip overlap with the Global Word Ledger
@@ -503,25 +524,11 @@ function connectWebSocket(url) {
       try {
         const data = JSON.parse(event.data);
         if (data.text) {
-          chrome.storage.local.get("logs", (store) => {
-            const logs = store.logs || [];
-            const existingLog = logs.find((l) => l.text === data.text);
-            if (existingLog) {
-              existingLog.report = data.report;
-            } else {
-              logs.push({
-                timestamp: Date.now(),
-                text: data.text,
-                report: data.report,
-              });
-            }
-            if (logs.length > 50) {
-              logs.shift();
-            }
-            chrome.storage.local.set({ logs }, () => {
-              chrome.runtime.sendMessage({ action: "NEW_LOG" });
-            });
-          });
+          // Attach the report to the existing log entry written by
+          // handleSegmentedSentence(). If that async write hasn't landed
+          // yet, retry up to 5 times (250ms total) rather than creating a
+          // duplicate entry — this is the root cause of double feed items.
+          _attachReportToLog(data.text, data.report, 0);
         }
       } catch (err) {
         console.error("Error parsing WebSocket message:", err);
@@ -562,6 +569,48 @@ function disconnectWebSocket() {
 // ============================================================================
 
 /**
+ * Attach a backend report to an existing log entry identified by text.
+ *
+ * Uses a retry loop (up to MAX_RETRIES × RETRY_MS) to handle the race where
+ * socket.onmessage fires before handleSegmentedSentence's async storage write
+ * has landed. Previously this race caused a duplicate log entry to be created
+ * by the `else { logs.push(...) }` branch in onmessage.
+ *
+ * @param {string} text      — The sentence text to match.
+ * @param {*}      report    — The verdict report from the backend.
+ * @param {number} attempt   — Current retry count (start at 0).
+ */
+function _attachReportToLog(text, report, attempt) {
+  const MAX_RETRIES = 5;
+  const RETRY_MS = 50;
+
+  chrome.storage.local.get("logs", (store) => {
+    const logs = store.logs || [];
+    const existingLog = logs.find((l) => l.text === text);
+
+    if (existingLog) {
+      // Found — attach the report and persist
+      existingLog.report = report;
+      chrome.storage.local.set({ logs }, () => {
+        chrome.runtime.sendMessage({ action: "NEW_LOG" });
+      });
+    } else if (attempt < MAX_RETRIES) {
+      // Entry not yet written by handleSegmentedSentence — retry shortly
+      console.log(`_attachReportToLog: entry not found, retry ${attempt + 1}/${MAX_RETRIES}`);
+      setTimeout(() => _attachReportToLog(text, report, attempt + 1), RETRY_MS);
+    } else {
+      // Gave up retrying — create the entry so the verdict is not lost
+      console.warn("_attachReportToLog: gave up waiting for log entry, creating fallback.");
+      logs.push({ timestamp: Date.now(), text, report });
+      if (logs.length > 50) logs.shift();
+      chrome.storage.local.set({ logs }, () => {
+        chrome.runtime.sendMessage({ action: "NEW_LOG" });
+      });
+    }
+  });
+}
+
+/**
  * Handle a fully segmented sentence — send it to the backend and log it.
  */
 function handleSegmentedSentence(text) {
@@ -594,3 +643,4 @@ function handleSegmentedSentence(text) {
     }
   });
 }
+
