@@ -213,6 +213,15 @@ document.addEventListener("DOMContentLoaded", () => {
   function buildReportBlock(rep) {
     const classification = (rep.classification || "NEUTRAL").toUpperCase();
 
+    // Map classification → badge CSS class + label
+    const BADGE_MAP = {
+      CONTRADICTION: { cls: "contradiction", label: "🚨 Contradiction" },
+      CONSISTENT:    { cls: "consistent",    label: "✓ Consistent" },
+      NEUTRAL:       { cls: "neutral",        label: "— Neutral" },
+      UNVERIFIED:    { cls: "unverified",     label: "◈ Unverified" },
+    };
+    const badgeDef = BADGE_MAP[classification] || BADGE_MAP.NEUTRAL;
+
     const block = document.createElement("div");
     block.className = "verdict-report";
 
@@ -224,12 +233,22 @@ document.addEventListener("DOMContentLoaded", () => {
       block.appendChild(tag);
     }
 
-    // Claim text (current)
+    // Claim text + per-claim verdict badge — side-by-side in a flex row
     if (rep.claim) {
-      const claimEl = document.createElement("div");
-      claimEl.style.cssText = "font-size:11px; font-weight:bold; margin-top:4px;";
-      claimEl.textContent = rep.claim;
-      block.appendChild(claimEl);
+      const claimRow = document.createElement("div");
+      claimRow.className = "claim-row";
+
+      const claimText = document.createElement("div");
+      claimText.className = "claim-text";
+      claimText.textContent = rep.claim;
+
+      const claimBadge = document.createElement("span");
+      claimBadge.className = `claim-verdict-badge ${badgeDef.cls}`;
+      claimBadge.textContent = badgeDef.label;
+
+      claimRow.appendChild(claimText);
+      claimRow.appendChild(claimBadge);
+      block.appendChild(claimRow);
     }
 
     // Collapsible historical comparison (12.2.a)
