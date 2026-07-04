@@ -1,67 +1,67 @@
-console.log("Live Claim Consistency Tracker content script initialized.");
+console.log("[content.js] Live Claim Consistency Tracker content script initialized.");
 
 /**
- * Word-level YouTube caption stream collector — Milestone 10.1
+ * Word-level YouTube caption stream collector — Milestone 10.1 / 11.1
  *
- * Changes from Milestone 9:
- *   - Maintains a `globalWordBuffer` (append-only, no cap) as the canonical
- *     session-level truth of every word ever seen from captions.
- *   - Attaches a `bufferSnapshot` (last 100 words joined as a string) to every
- *     CAPTION_CHUNK message so background.js can cross-reference during
- *     pause-based sentence segmentation.
- *   - Adds `resetBuffer()` hooked to YouTube's `yt-navigate-finish` event to
- *     clear state cleanly on video navigation.
- *   - Removes the redundant `isDuplicate()` / `recentChunks` rolling window —
- *     the Global Word Ledger in background.js is strictly more powerful and
- *     supersedes it entirely.
+ * Milestone 11.1 additions:
+ *   - `probeForTranscript()` — on page load and yt-navigate-finish, tries to
+ *     find YouTube's "Show transcript" button (via the overflow `...` menu,
+ *     Option A), scrape all segments, and send them as FULL_TRANSCRIPT to
+ *     background.js. Falls back to live captions if no transcript is found.
+ *   - `clickTranscriptAndScrape()` — clicks the button, waits for segment
+ *     elements via MutationObserver, collects { text, startMs }.
+ *   - `transcriptMode` flag — when true, the caption MutationObserver is
+ *     disconnected and processCaptions() is a no-op.
+ *   - Structured debug prints on every code path so caption vs. transcript
+ *     mode is immediately visible in the browser console.
  *
- * The 150ms debounce prevents capturing mid-render partial words (e.g. "SECURIT"
- * instead of "SECURITY") that YouTube writes character-by-character.
+ * Milestone 10.1 (unchanged):
+ *   - Maintains `globalWordBuffer` (append-only) as the canonical session log.
+ *   - Attaches `bufferSnapshot` (last 100 words) to every CAPTION_CHUNK.
+ *   - `resetBuffer()` hooked to `yt-navigate-finish`.
  *
- * Sentence segmentation is handled by the StreamBuffer in background.js.
+ * The 150ms debounce prevents capturing mid-render partial words.
  */
 
-// --- State ---
+// =============================================================================
+// State
+// =============================================================================
 
 /**
  * Append-only session log of every word seen from captions.
- * No cap — this is the canonical truth for the current video session.
- * Attached as a `bufferSnapshot` (last 100 words) on every CAPTION_CHUNK.
+ * No cap — canonical truth for the current video session.
  */
 let globalWordBuffer = [];
 
-let previousWords = [];   // flat word array from last caption observation
-let debounceTimer = null; // MutationObserver debounce timer
-let captionObserver = null; // MutationObserver instance (kept for reset)
+let previousWords    = [];   // flat word array from last caption observation
+let debounceTimer    = null; // MutationObserver debounce timer
+let captionObserver  = null; // MutationObserver instance (kept for reset)
 
-// --- Core diff algorithm (word-level) ---
+/**
+ * true once a human-authored transcript has been found and scraped.
+ * When true, processCaptions() is a no-op and the caption observer is
+ * disconnected so no CAPTION_CHUNK messages are emitted in parallel.
+ */
+let transcriptMode = false;
+
+// =============================================================================
+// Core diff algorithm (word-level) — unchanged from Milestone 10.1
+// =============================================================================
 
 /**
  * Find genuinely new words by suffix/prefix overlap between two word arrays.
  *
  * YouTube extends captions in-place — a segment like "THE ECONOMY HAS" becomes
- * "THE ECONOMY HAS BEEN GROWING". Segment-level comparison sees these as
- * completely different strings. Word-level comparison correctly finds the overlap
- * and emits only ["BEEN", "GROWING"].
+ * "THE ECONOMY HAS BEEN GROWING". Word-level comparison finds the overlap and
+ * emits only ["BEEN", "GROWING"].
  *
  * Algorithm: find the longest suffix of `prev` that matches a prefix of `curr`,
  * then return only the words after that overlap.
- *
- * Example:
- *   prev = ["THE", "ECONOMY", "HAS", "BEEN", "GROWING"]
- *   curr = ["BEEN", "GROWING", "AT", "A", "RATE", "OF"]
- *   → overlap: ["BEEN", "GROWING"]
- *   → returns: ["AT", "A", "RATE", "OF"]
  */
 function computeNewWords(prev, curr) {
-  if (prev.length === 0) {
-    return curr;
-  }
-  if (curr.length === 0) {
-    return [];
-  }
+  if (prev.length === 0) return curr;
+  if (curr.length === 0) return [];
 
-  // Find the longest suffix of prev matching a prefix of curr
   const maxOverlap = Math.min(prev.length, curr.length);
 
   for (let overlapLen = maxOverlap; overlapLen >= 1; overlapLen--) {
@@ -72,37 +72,34 @@ function computeNewWords(prev, curr) {
         break;
       }
     }
-    if (matches) {
-      return curr.slice(overlapLen);
-    }
+    if (matches) return curr.slice(overlapLen);
   }
 
   // No overlap — YouTube did a full caption window replacement
   return curr;
 }
 
-// --- Debounced caption processing ---
+// =============================================================================
+// Debounced caption processing (Milestone 10.1 / 11.1 guard)
+// =============================================================================
 
 /**
  * Read the current caption DOM state, diff against previous, and emit new words.
  * Called 150ms after the last MutationObserver event (debounced).
  *
- * New in Milestone 10.1:
- *   - Appends new words to `globalWordBuffer` (accumulate only; never replace).
- *   - Sends `bufferSnapshot` (last 100 words of globalWordBuffer) alongside the
- *     delta chunk so background.js can confirm pause boundaries.
+ * 11.1: If `transcriptMode` is true this function is a no-op — the transcript
+ * has already been sent to background.js and the observer is being disconnected.
  */
 function processCaptions() {
+  // 11.1 — do nothing if the transcript path has taken over
+  if (transcriptMode) return;
+
   const captionElements = document.querySelectorAll(".ytp-caption-segment");
   if (!captionElements || captionElements.length === 0) {
-    // Caption window cleared — reset so next render is treated as new
-    if (previousWords.length > 0) {
-      previousWords = [];
-    }
+    if (previousWords.length > 0) previousWords = [];
     return;
   }
 
-  // Flatten all segments into a single word array
   const fullText = Array.from(captionElements)
     .map((el) => el.textContent.trim())
     .join(" ")
@@ -110,24 +107,21 @@ function processCaptions() {
     .trim();
 
   const currentWords = fullText ? fullText.split(" ") : [];
-
-  // Word-level diff
-  const newWords = computeNewWords(previousWords, currentWords);
-  previousWords = [...currentWords];
+  const newWords     = computeNewWords(previousWords, currentWords);
+  previousWords      = [...currentWords];
 
   if (newWords.length === 0) return;
 
-  // 10.1.b — Accumulate into the global word buffer (never replace)
+  // 10.1.b — accumulate into the global word buffer
   globalWordBuffer.push(...newWords);
 
   const newText = newWords.join(" ").trim();
   if (!newText) return;
 
-  // 10.1.c — Build bufferSnapshot from last 100 words of globalWordBuffer
+  // 10.1.c — build bufferSnapshot from last 100 words
   const bufferSnapshot = globalWordBuffer.slice(-100).join(" ");
 
-  // Emit raw word chunk + snapshot to background worker
-  console.log("Caption chunk:", newText);
+  console.log(`[content.js] 🔊 Caption chunk: "${newText}"`);
   chrome.runtime.sendMessage({
     action: "CAPTION_CHUNK",
     text: newText,
@@ -135,45 +129,270 @@ function processCaptions() {
   });
 }
 
-// --- Buffer reset (on video navigation) ---
+// =============================================================================
+// Buffer / session reset (on video navigation)
+// =============================================================================
 
 /**
  * Reset all session state when the user navigates to a new video.
  * Hooked to YouTube's yt-navigate-finish document event.
  */
 function resetBuffer() {
-  console.log("Content script: resetting globalWordBuffer and previousWords on navigation.");
+  console.log("[content.js] 🔄 Navigation detected — resetting session state.");
   globalWordBuffer = [];
-  previousWords = [];
+  previousWords    = [];
+  transcriptMode   = false;
+  // Inform background.js so it can reset transcriptMode flag
+  chrome.runtime.sendMessage({ action: "NAVIGATE_FINISH" });
+  // Re-arm the transcript probe for the new video (with delay for DOM hydration)
+  setTimeout(() => probeForTranscript(1), 2000);
 }
 
 document.addEventListener("yt-navigate-finish", resetBuffer);
 
-// --- DOM Observer (debounced) ---
+// =============================================================================
+// Milestone 11.1 — Transcript Detection & Scraping
+// =============================================================================
+
+/**
+ * Parse a YouTube transcript timestamp string ("M:SS" or "H:MM:SS") into
+ * milliseconds.
+ *
+ * @param {string} ts — e.g. "1:23" or "1:02:45"
+ * @returns {number} milliseconds
+ */
+function parseTimestampMs(ts) {
+  if (!ts) return 0;
+  const parts = ts.trim().split(":").map(Number);
+  if (parts.length === 2) {
+    // M:SS
+    return (parts[0] * 60 + parts[1]) * 1000;
+  }
+  if (parts.length === 3) {
+    // H:MM:SS
+    return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+  }
+  return 0;
+}
+
+/**
+ * Wait for at least one `ytd-transcript-segment-renderer` element to appear
+ * inside `container`, up to `timeoutMs`. Uses a MutationObserver so it does
+ * not busy-poll.
+ *
+ * @param {Element} container
+ * @param {number}  timeoutMs
+ * @returns {Promise<boolean>} — true if segments appeared, false on timeout
+ */
+function waitForTranscriptSegments(container, timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    // Already present?
+    if (container.querySelector("ytd-transcript-segment-renderer")) {
+      return resolve(true);
+    }
+
+    let settled = false;
+    const obs = new MutationObserver(() => {
+      if (container.querySelector("ytd-transcript-segment-renderer")) {
+        if (!settled) {
+          settled = true;
+          obs.disconnect();
+          resolve(true);
+        }
+      }
+    });
+
+    obs.observe(container, { childList: true, subtree: true });
+
+    setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        obs.disconnect();
+        resolve(false);
+      }
+    }, timeoutMs);
+  });
+}
+
+/**
+ * Scrape all transcript segments from the open transcript panel.
+ *
+ * @returns {{ text: string, startMs: number }[]}
+ */
+function scrapeTranscriptSegments() {
+  const segmentEls = document.querySelectorAll("ytd-transcript-segment-renderer");
+  const segments   = [];
+
+  segmentEls.forEach((el) => {
+    const textEl      = el.querySelector(".segment-text");
+    const timestampEl = el.querySelector(".segment-timestamp");
+
+    const text    = textEl      ? textEl.textContent.trim()      : "";
+    const startMs = timestampEl ? parseTimestampMs(timestampEl.textContent) : 0;
+
+    if (text) segments.push({ text, startMs });
+  });
+
+  return segments;
+}
+
+/**
+ * Click the "Show transcript" button (now known to be visible in the DOM),
+ * wait for segment elements, scrape them, and return the array.
+ *
+ * @param {Element} transcriptBtn
+ * @returns {Promise<{ text: string, startMs: number }[]>}
+ */
+async function clickTranscriptAndScrape(transcriptBtn) {
+  console.log("[content.js] 🖱️  Clicking 'Show transcript'…");
+  transcriptBtn.click();
+
+  // YouTube renders the panel inside ytd-engagement-panel-section-list-renderer
+  // or directly in document body — observe the whole document for safety.
+  const appeared = await waitForTranscriptSegments(document.body, 3000);
+
+  if (!appeared) {
+    console.warn("[content.js] ⚠️  Transcript segments did not appear within 3 s.");
+    return [];
+  }
+
+  const segments = scrapeTranscriptSegments();
+  console.log(`[content.js] 📄 Scraped ${segments.length} transcript segments.`);
+  return segments;
+}
+
+/**
+ * Attempt to find the "Show transcript" button using Option A:
+ *  1. Check for a directly-visible button with aria-label "Show transcript".
+ *  2. If not found, click the overflow `...` / "More" button to expand the
+ *     secondary menu, wait 500 ms for the menu to open, then re-probe once.
+ *
+ * @returns {Promise<Element|null>} — the button element, or null if not found
+ */
+async function findTranscriptButton() {
+  // Direct probe first (handles videos where the button is already visible)
+  const direct = document.querySelector('[aria-label="Show transcript"]');
+  if (direct) return direct;
+
+  // Option A — try the overflow `...` / "More" button
+  // YouTube places it in ytd-menu-renderer on the watch page
+  const overflowBtn = document.querySelector(
+    "ytd-menu-renderer button.yt-icon-button, " +
+    "#top-level-buttons-computed ytd-button-renderer:last-child button, " +
+    "[aria-label='More actions']"
+  );
+
+  if (!overflowBtn) return null;
+
+  console.log("[content.js] 🔍 Opening overflow menu to look for 'Show transcript'…");
+  overflowBtn.click();
+
+  // Wait for the menu to render
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Re-probe — YouTube's popup menu items use ytd-menu-service-item-renderer
+  const menuItems = document.querySelectorAll(
+    "ytd-menu-service-item-renderer, tp-yt-paper-item"
+  );
+  for (const item of menuItems) {
+    if (item.textContent && item.textContent.trim().toLowerCase().includes("show transcript")) {
+      return item;
+    }
+  }
+
+  // Also check aria-label in the newly opened menu
+  return document.querySelector('[aria-label="Show transcript"]');
+}
+
+/**
+ * Main transcript probe — called on page load and after every navigation.
+ *
+ * Strategy:
+ *   1. Try to find the transcript button (with overflow menu fallback).
+ *   2. If found: scrape, send FULL_TRANSCRIPT, disable caption observer.
+ *   3. If not found after `maxAttempts` tries: fall back to live captions.
+ *
+ * @param {number} attempt    — current attempt (1-indexed, max 3)
+ * @param {number} maxAttempts — total allowed attempts (default 3)
+ */
+async function probeForTranscript(attempt = 1, maxAttempts = 3) {
+  console.log(`[content.js] 🔍 Probing for transcript button (attempt ${attempt}/${maxAttempts})…`);
+
+  const btn = await findTranscriptButton();
+
+  if (btn) {
+    console.log("[content.js] ✅ Transcript button found — scraping…");
+
+    // 11.1.b — notify background that a transcript is available
+    const videoId = new URLSearchParams(window.location.search).get("v") || "";
+    chrome.runtime.sendMessage({ action: "TRANSCRIPT_AVAILABLE", videoId });
+
+    // 11.1.c — click & scrape
+    const segments = await clickTranscriptAndScrape(btn);
+
+    if (segments.length === 0) {
+      console.warn("[content.js] ⚠️  Scrape returned 0 segments — falling back to captions.");
+      return; // caption observer stays connected
+    }
+
+    // 11.1.d — send full transcript to background
+    console.log(`[content.js] 📄 FULL_TRANSCRIPT sent: ${segments.length} segments.`);
+    chrome.runtime.sendMessage({
+      action: "FULL_TRANSCRIPT",
+      segments,
+      videoId,
+    });
+
+    // 11.1.e — disable caption observer to prevent parallel processing
+    transcriptMode = true;
+    if (captionObserver) {
+      captionObserver.disconnect();
+      console.log("[content.js] 🔇 Caption observer disconnected (transcript mode active).");
+    }
+    chrome.runtime.sendMessage({ action: "DISABLE_CAPTION_SCRAPER" });
+
+  } else if (attempt < maxAttempts) {
+    // Retry after 1 second (handles late DOM rendering)
+    console.log(`[content.js] ⏳ Transcript button not found yet — retrying in 1 s…`);
+    setTimeout(() => probeForTranscript(attempt + 1, maxAttempts), 1000);
+
+  } else {
+    // All attempts exhausted — use live captions
+    console.log(
+      `[content.js] ❌ No transcript button found after ${maxAttempts} attempts — using live captions.`
+    );
+  }
+}
+
+// =============================================================================
+// DOM Observer (debounced) — unchanged from Milestone 10.1
+// =============================================================================
 
 const observer = new MutationObserver(() => {
   // Debounce: wait 150ms after the last mutation before reading the DOM.
-  // YouTube renders words character-by-character; this ensures we capture
-  // complete words rather than partial renders like "SECURIT".
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-  }
+  if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(processCaptions, 150);
 });
 
 captionObserver = observer;
 
-// --- Initialization ---
+// =============================================================================
+// Initialization
+// =============================================================================
 
 function startObserving() {
   const targetNode =
     document.querySelector(".ytp-caption-window-container") || document.body;
   observer.observe(targetNode, {
-    childList: true,
-    subtree: true,
+    childList:     true,
+    subtree:       true,
     characterData: true,
   });
-  console.log("Observing caption container:", targetNode);
+  console.log("[content.js] 👁️  Observing caption container:", targetNode.nodeName);
+
+  // 11.1.a — probe for transcript on page load (with slight delay so the
+  // watch page buttons have time to hydrate)
+  setTimeout(() => probeForTranscript(1), 2000);
 }
 
 if (document.readyState === "loading") {

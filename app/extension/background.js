@@ -2,6 +2,25 @@ let socket = null;
 let reconnectTimer = null;
 
 // ============================================================================
+// Milestone 11.2.b — transcriptMode flag
+// ============================================================================
+
+/**
+ * In-memory mirror of chrome.storage.local.transcriptMode.
+ * Set to true when a FULL_TRANSCRIPT is received; reset on navigation or
+ * DISABLE_CAPTION_SCRAPER (which also fires on navigation reset).
+ */
+let _transcriptMode = false;
+
+function _setTranscriptMode(value) {
+  _transcriptMode = value;
+  chrome.storage.local.set({ transcriptMode: value });
+  // Notify the side panel so it can update the badge immediately
+  chrome.runtime.sendMessage({ action: "TRANSCRIPT_MODE_CHANGED", transcriptMode: value });
+  console.log(`[bg] 🏷️  transcriptMode → ${value}`);
+}
+
+// ============================================================================
 // StreamBuffer — Sentence segmenter for raw caption chunks (Milestone 10.2)
 // ============================================================================
 
@@ -401,7 +420,7 @@ class StreamBuffer {
     }
 
     this._lastFlushMethod = flushMethod;
-    console.log(`StreamBuffer [${flushMethod}]: Sentence ready:`, dedupedSentence);
+    console.log(`[bg] 🔊 StreamBuffer [${flushMethod}] → sentence ready: "${dedupedSentence}"`);
     this.onSentenceReady(dedupedSentence);
   }
 
@@ -466,6 +485,79 @@ class StreamBuffer {
 }
 
 // ============================================================================
+// Milestone 11.2.a — splitIntoSentences(text) top-level utility
+// ============================================================================
+
+/**
+ * Split a block of text into complete sentences using rule-based punctuation
+ * detection — the same logic as StreamBuffer._tryRuleBasedSplit(), but
+ * operating on an already-complete text block rather than a streaming buffer.
+ *
+ * Rules:
+ *   - Split on `.`, `!`, `?` followed by whitespace + uppercase letter OR end of string.
+ *   - Require at least 4 words before the punctuation (avoids abbreviation splits).
+ *   - Skip splits where the word before punctuation is a known abbreviation.
+ *   - Skip splits inside numbers (e.g., "3.5%").
+ *
+ * @param {string} text
+ * @returns {string[]}
+ */
+const _SPLIT_ABBREVIATIONS = new Set([
+  "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "ave",
+  "vs", "etc", "approx", "dept", "est", "inc", "ltd", "corp",
+  "gen", "gov", "sgt", "capt", "col", "lt", "rep", "sen",
+  "u.s", "u.k", "e.u", "u.n",
+]);
+
+function splitIntoSentences(text) {
+  const sentences = [];
+  let remaining   = (text || "").trim();
+
+  while (remaining.length > 0) {
+    const match = remaining.match(/[.!?](\s+[A-Z]|\s*$)/);
+
+    if (!match) {
+      // No more sentence-ending punctuation — treat the rest as one sentence
+      if (remaining.trim()) sentences.push(remaining.trim());
+      break;
+    }
+
+    const splitIndex = match.index + 1;
+    const candidate = remaining.substring(0, splitIndex).trim();
+    const words     = candidate.split(/\s+/);
+
+    // Need at least 4 words to avoid splitting "Mr. Smith"
+    if (words.length < 4) {
+      // Skip this match — treat punctuation as part of current text
+      const nextSearch = remaining.indexOf(match[0], match.index + 1);
+      if (nextSearch === -1) {
+        if (remaining.trim()) sentences.push(remaining.trim());
+        break;
+      }
+      remaining = remaining.substring(match.index + 1);
+      continue;
+    }
+
+    const lastWord = words[words.length - 1].replace(/[.!?]+$/, "").toLowerCase();
+    if (_SPLIT_ABBREVIATIONS.has(lastWord)) {
+      remaining = remaining.substring(match.index + 1);
+      continue;
+    }
+
+    // Skip decimal numbers like "3.5"
+    if (/\d\.\d/.test(candidate.slice(-6))) {
+      remaining = remaining.substring(match.index + 1);
+      continue;
+    }
+
+    sentences.push(candidate);
+    remaining = remaining.substring(splitIndex).trim();
+  }
+
+  return sentences;
+}
+
+// ============================================================================
 // Instantiate the StreamBuffer
 // ============================================================================
 
@@ -489,17 +581,54 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "CONNECT") {
     connectWebSocket(message.url);
+
   } else if (message.action === "DISCONNECT") {
     disconnectWebSocket();
+
+  // ---------------------------------------------------------------------------
+  // Milestone 11.2.d — Transcript path
+  // ---------------------------------------------------------------------------
+  } else if (message.action === "TRANSCRIPT_AVAILABLE") {
+    console.log(`[bg] 📄 TRANSCRIPT_AVAILABLE for videoId: ${message.videoId}`);
+
+  } else if (message.action === "FULL_TRANSCRIPT") {
+    console.log(`[bg] 📄 FULL_TRANSCRIPT received: ${(message.segments || []).length} segments — switching to transcript mode.`);
+    _setTranscriptMode(true);
+    streamBuffer.reset(); // ensure live buffer is clean
+    processFullTranscript(message.segments || []);
+
+  } else if (message.action === "DISABLE_CAPTION_SCRAPER") {
+    console.log("[bg] 🔇 DISABLE_CAPTION_SCRAPER received — caption processing disabled.");
+    _setTranscriptMode(true);
+
+  } else if (message.action === "NAVIGATE_FINISH") {
+    // content.js fires this when yt-navigate-finish fires so background.js
+    // can reset transcriptMode in sync with the new video.
+    console.log("[bg] 🔄 NAVIGATE_FINISH — resetting transcriptMode.");
+    _setTranscriptMode(false);
+    streamBuffer.reset();
+
+  // ---------------------------------------------------------------------------
+  // Milestone 11.2.e — Status query
+  // ---------------------------------------------------------------------------
+  } else if (message.action === "TRANSCRIPT_MODE_STATUS") {
+    sendResponse({ transcriptMode: _transcriptMode });
+    return true; // keep channel open for async response
+
+  // ---------------------------------------------------------------------------
+  // Live caption path (Milestone 10.2.d)
+  // ---------------------------------------------------------------------------
   } else if (message.action === "CAPTION_CHUNK") {
-    // 10.2.d — pass both text and bufferSnapshot into the StreamBuffer
+    console.log(`[bg] 🔊 CAPTION_CHUNK received (caption mode): "${message.text}"`);
     streamBuffer.addChunk(message.text, message.bufferSnapshot || "");
+
   } else if (message.action === "TRANSCRIPT_CAPTURED") {
     // Legacy: still accept pre-formed sentences (e.g., from other sources)
     handleSegmentedSentence(message.text);
+
   } else if (message.action === "CLEAR_BUFFER") {
     streamBuffer.reset();
-    console.log("StreamBuffer: reset via CLEAR_BUFFER message.");
+    console.log("[bg] 🗑️  StreamBuffer reset via CLEAR_BUFFER.");
   }
 });
 
@@ -610,6 +739,54 @@ function _attachReportToLog(text, report, attempt) {
   });
 }
 
+// ============================================================================
+// Milestone 11.2.c — Full Transcript Processing Pipeline
+// ============================================================================
+
+/**
+ * Process a full pre-built transcript.
+ *
+ * 1. Concatenate all segment texts.
+ * 2. Split into sentences via splitIntoSentences().
+ * 3. Dedup each sentence against the Global Word Ledger.
+ * 4. Send each unique sentence via handleSegmentedSentence().
+ *
+ * @param {{ text: string, startMs: number }[]} segments
+ */
+function processFullTranscript(segments) {
+  if (!segments || segments.length === 0) {
+    console.warn("[bg] ⚠️  processFullTranscript called with 0 segments.");
+    return;
+  }
+
+  const fullText  = segments.map((s) => s.text).join(" ");
+  const sentences = splitIntoSentences(fullText);
+
+  console.log(`[bg] 📄 Transcript: split into ${sentences.length} sentences.`);
+
+  sentences.forEach((sentence, i) => {
+    const words    = sentence.trim().split(/\s+/);
+    const dedupedW = streamBuffer._stripOverlapWithLedger(words);
+
+    if (dedupedW.length === 0) {
+      console.log(`[bg] 📄 Transcript sentence [${i + 1}/${sentences.length}] suppressed (duplicate).`);
+      return;
+    }
+
+    // Append to ledger so subsequent sentences don't repeat these words
+    streamBuffer.emittedWords.push(...dedupedW);
+    if (streamBuffer.emittedWords.length > streamBuffer.MAX_LEDGER_WORDS) {
+      streamBuffer.emittedWords = streamBuffer.emittedWords.slice(
+        streamBuffer.emittedWords.length - streamBuffer.MAX_LEDGER_WORDS
+      );
+    }
+
+    const dedupedSentence = dedupedW.join(" ");
+    console.log(`[bg] 📄 Transcript sentence [${i + 1}/${sentences.length}]: "${dedupedSentence}"`);
+    handleSegmentedSentence(dedupedSentence);
+  });
+}
+
 /**
  * Handle a fully segmented sentence — send it to the backend and log it.
  */
@@ -621,9 +798,9 @@ function handleSegmentedSentence(text) {
   if (socket && socket.readyState === WebSocket.OPEN) {
     const payload = JSON.stringify({ sentence: cleanText });
     socket.send(payload);
-    console.log("Sent sentence to backend:", cleanText);
+    console.log(`[bg] ✉️  Sentence sent to backend: "${cleanText}"`);
   } else {
-    console.log("Cannot send sentence: WebSocket is not open.");
+    console.log(`[bg] ⚠️  Cannot send — WebSocket not open: "${cleanText}"`);
   }
 
   chrome.storage.local.get("logs", (data) => {

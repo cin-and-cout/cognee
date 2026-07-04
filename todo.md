@@ -209,32 +209,32 @@ If you are picking up this project, please follow these instructions:
 
 ### Milestone 11: Pre-Created Transcript Extraction (Should Have)
 
-- [ ] **[Task 11.1] Transcript Availability Detection & Scraping in `content.js`**
+- [x] **[Task 11.1] Transcript Availability Detection & Scraping in `content.js`**
   - **Focus:** Extension / DOM Scripting
   - **Branch:** `feature/11.1-transcript-detection`
   - **Description:** On page load (and on `yt-navigate-finish`), detect whether the video has a human-authored transcript by looking for YouTube's "Show transcript" button. If found, programmatically open the transcript panel, scrape all segments, and send them as a `FULL_TRANSCRIPT` message to `background.js`. Pause the live caption observer so captions and transcript are not double-processed.
   - **Sub-tasks:**
-    - [ ] **11.1.a** On page load and `yt-navigate-finish`, probe for the transcript trigger button via `document.querySelector('[aria-label="Show transcript"]')` (or nearest stable equivalent). Retry up to 3× with a 1-second delay to handle late DOM rendering.
-    - [ ] **11.1.b** If a transcript button is found, send a `TRANSCRIPT_AVAILABLE` message to `background.js` with `{ videoId }` extracted from `window.location.href`.
-    - [ ] **11.1.c** Implement `clickTranscriptAndScrape()`: programmatically click the button, wait up to 3 seconds for `ytd-transcript-segment-renderer` elements to appear (via `MutationObserver`), then collect all `{ text, startMs }` segments from the panel.
-    - [ ] **11.1.d** Send the collected data as `{ action: "FULL_TRANSCRIPT", segments: [{ text, startMs }], videoId }` to `background.js`.
-    - [ ] **11.1.e** After sending, post a `DISABLE_CAPTION_SCRAPER` message to `background.js` and also disconnect the local caption `MutationObserver` for this video to prevent parallel processing.
+    - [x] **11.1.a** On page load and `yt-navigate-finish`, probe for the transcript trigger button via `document.querySelector('[aria-label="Show transcript"]')` (or nearest stable equivalent). Retry up to 3× with a 1-second delay to handle late DOM rendering.
+    - [x] **11.1.b** If a transcript button is found, send a `TRANSCRIPT_AVAILABLE` message to `background.js` with `{ videoId }` extracted from `window.location.href`.
+    - [x] **11.1.c** Implement `clickTranscriptAndScrape()`: programmatically click the button, wait up to 3 seconds for `ytd-transcript-segment-renderer` elements to appear (via `MutationObserver`), then collect all `{ text, startMs }` segments from the panel.
+    - [x] **11.1.d** Send the collected data as `{ action: "FULL_TRANSCRIPT", segments: [{ text, startMs }], videoId }` to `background.js`.
+    - [x] **11.1.e** After sending, post a `DISABLE_CAPTION_SCRAPER` message to `background.js` and also disconnect the local caption `MutationObserver` for this video to prevent parallel processing.
   - **Verification:** Open a TED Talk YouTube video (which always has a human transcript). Confirm `FULL_TRANSCRIPT` arrives in `background.js` console within 5 seconds of page load. Confirm the caption observer produces no `CAPTION_CHUNK` messages in parallel.
 
-- [ ] **[Task 11.2] Full Transcript Processing Pipeline in `background.js`**
+- [x] **[Task 11.2] Full Transcript Processing Pipeline in `background.js`**
   - **Focus:** Extension / Background Worker
   - **Branch:** `feature/11.2-transcript-pipeline`
   - **Description:** When a `FULL_TRANSCRIPT` message is received, split the transcript into sentences using the existing rule-based punctuation splitter (extracted as a shared utility), deduplicate via the Global Word Ledger, and send sentences to the backend. Add a `transcriptMode` flag and expose a UI badge in the side panel.
   - **Sub-tasks:**
-    - [ ] **11.2.a** Extract `StreamBuffer._tryRuleBasedSplit()` logic into a standalone top-level utility function `splitIntoSentences(text: string): string[]` in `background.js` to avoid duplication between transcript and live modes.
-    - [ ] **11.2.b** Add a `transcriptMode: boolean` flag to `chrome.storage.local`. Set to `true` on `TRANSCRIPT_AVAILABLE`; reset to `false` on `yt-navigate-finish` or `DISABLE_CAPTION_SCRAPER`.
-    - [ ] **11.2.c** Implement `processFullTranscript(segments)` in `background.js`:
+    - [x] **11.2.a** Extract `StreamBuffer._tryRuleBasedSplit()` logic into a standalone top-level utility function `splitIntoSentences(text: string): string[]` in `background.js` to avoid duplication between transcript and live modes.
+    - [x] **11.2.b** Add a `transcriptMode: boolean` flag to `chrome.storage.local`. Set to `true` on `TRANSCRIPT_AVAILABLE`; reset to `false` on `yt-navigate-finish` or `DISABLE_CAPTION_SCRAPER`.
+    - [x] **11.2.c** Implement `processFullTranscript(segments)` in `background.js`:
       - Concatenate all segment texts with a single space.
       - Call `splitIntoSentences()` to produce an ordered array of sentences.
       - Run each sentence through the Global Word Ledger dedup (`streamBuffer._stripOverlapWithLedger()`).
       - Send each non-duplicate sentence via `handleSegmentedSentence()`.
-    - [ ] **11.2.d** Wire up `FULL_TRANSCRIPT` in the `chrome.runtime.onMessage.addListener` block to call `processFullTranscript()`.
-    - [ ] **11.2.e** Add a `TRANSCRIPT_MODE_STATUS` query message handler that `sidepanel.js` can poll on load to conditionally show a `📄 Using Pre-built Transcript` badge in the UI.
+    - [x] **11.2.d** Wire up `FULL_TRANSCRIPT` in the `chrome.runtime.onMessage.addListener` block to call `processFullTranscript()`.
+    - [x] **11.2.e** Add a `TRANSCRIPT_MODE_STATUS` query message handler that `sidepanel.js` can poll on load to conditionally show a `📄 Using Pre-built Transcript` badge in the UI.
   - **Verification:** On a TED Talk, confirm all sentences are extracted with correct punctuation splits and sent to the backend in order. Confirm the side panel feed displays them correctly. Confirm `StreamBuffer` stays idle (no `CAPTION_CHUNK` handled) during transcript mode.
 
 ---

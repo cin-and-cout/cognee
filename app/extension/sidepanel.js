@@ -1,12 +1,13 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const wsUrlInput   = document.getElementById("ws-url");
-  const statusBadge  = document.getElementById("status-badge");
-  const toggleBtn    = document.getElementById("toggle-btn");
-  const clearBtn     = document.getElementById("clear-btn");
-  const feedList     = document.getElementById("feed-list");
-  const statsBar     = document.getElementById("stats-bar");
-  const snackbar     = document.getElementById("snackbar");
-  const snackbarUndo = document.getElementById("snackbar-undo");
+  const wsUrlInput        = document.getElementById("ws-url");
+  const statusBadge       = document.getElementById("status-badge");
+  const toggleBtn         = document.getElementById("toggle-btn");
+  const clearBtn          = document.getElementById("clear-btn");
+  const feedList          = document.getElementById("feed-list");
+  const statsBar          = document.getElementById("stats-bar");
+  const snackbar          = document.getElementById("snackbar");
+  const snackbarUndo      = document.getElementById("snackbar-undo");
+  const transcriptBadge   = document.getElementById("transcript-mode-badge");
 
   // In-memory snapshot used by the Undo action (task 12.1.d)
   let _preClearSnapshot = null;
@@ -20,6 +21,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (data.wsUrl) wsUrlInput.value = data.wsUrl;
     updateUI(data.isRunning || false);
     renderFeed(data.logs || []);
+  });
+
+  // 11.2.e — Query transcript mode status on load
+  chrome.runtime.sendMessage({ action: "TRANSCRIPT_MODE_STATUS" }, (resp) => {
+    if (resp && resp.transcriptMode) {
+      setTranscriptBadge(true);
+    }
   });
 
   // ============================================================================
@@ -85,6 +93,9 @@ document.addEventListener("DOMContentLoaded", () => {
       chrome.storage.local.get("logs", (data) => {
         renderFeed(data.logs || []);
       });
+    } else if (message.action === "TRANSCRIPT_MODE_CHANGED") {
+      // 11.2.e — real-time badge update
+      setTranscriptBadge(message.transcriptMode);
     }
   });
 
@@ -103,6 +114,15 @@ document.addEventListener("DOMContentLoaded", () => {
       statusBadge.className   = "badge disconnected";
       toggleBtn.textContent   = "Connect & Listen";
       toggleBtn.className     = "btn";
+    }
+  }
+
+  // 11.2.e — Show / hide the transcript mode badge
+  function setTranscriptBadge(active) {
+    if (active) {
+      transcriptBadge.classList.remove("hidden");
+    } else {
+      transcriptBadge.classList.add("hidden");
     }
   }
 
