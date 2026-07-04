@@ -179,25 +179,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (log.report === null) {
       // 12.2.c — analyzing state
       badgeHtml = `<span class="verdict-badge analyzing">⏳ Analyzing…</span>`;
-    } else if (Array.isArray(log.report) && log.report.length === 0) {
-      // 12.2.d — unverified (no historical match)
-      badgeHtml = `<span class="verdict-badge unverified">◈ Unverified</span>`;
-    } else if (Array.isArray(log.report) && log.report.length > 0) {
-      // Pick the most severe verdict to show at the top level
-      const hasContradiction = log.report.some(
-        (r) => (r.classification || "").toUpperCase() === "CONTRADICTION"
-      );
-      const hasConsistent = log.report.some(
-        (r) => (r.classification || "").toUpperCase() === "CONSISTENT"
-      );
-
-      if (hasContradiction) {
+    } else if (log.report.pipeline_status === "no_claim") {
+      badgeHtml = `<span class="verdict-badge neutral">⚪ No Claim</span>`;
+    } else if (log.report.pipeline_status === "added_unverified") {
+      badgeHtml = `<span class="verdict-badge unverified">◈ Added to DB</span>`;
+    } else if (log.report.pipeline_status === "skipped_unverified") {
+      badgeHtml = `<span class="verdict-badge unverified">◈ Skipped (Low Conf)</span>`;
+    } else if (log.report.pipeline_status === "compared_added" || log.report.pipeline_status === "compared_skipped") {
+      const isConsistent = log.report.verdict?.is_consistent;
+      const label = (log.report.verdict?.label || "").toUpperCase();
+      if (isConsistent === false || label.includes("CONTRADICT")) {
         badgeHtml = `<span class="verdict-badge contradiction">🚨 Contradiction</span>`;
-      } else if (hasConsistent) {
+      } else if (isConsistent === true || label.includes("CONSISTENT")) {
         badgeHtml = `<span class="verdict-badge consistent">✓ Consistent</span>`;
       } else {
         badgeHtml = `<span class="verdict-badge neutral">— Neutral</span>`;
       }
+    } else {
+      badgeHtml = `<span class="verdict-badge neutral">— Unverified</span>`;
     }
 
     // --- Header row: badge (left) + timestamp (right) ---
@@ -225,10 +224,8 @@ document.addEventListener("DOMContentLoaded", () => {
     wrapper.appendChild(speakerBadge);
 
     // --- Per-report blocks ---
-    if (Array.isArray(log.report) && log.report.length > 0) {
-      log.report.forEach((rep) => {
-        wrapper.appendChild(buildReportBlock(rep));
-      });
+    if (log.report && log.report.pipeline_status !== "no_claim") {
+      wrapper.appendChild(buildReportBlock(log.report));
     }
 
     return wrapper;
@@ -239,36 +236,37 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============================================================================
 
   function buildReportBlock(rep) {
-    const classification = (rep.classification || "NEUTRAL").toUpperCase();
-
-    // Map classification → badge CSS class + label
-    const BADGE_MAP = {
-      CONTRADICTION: { cls: "contradiction", label: "🚨 Contradiction" },
-      CONSISTENT:    { cls: "consistent",    label: "✓ Consistent" },
-      NEUTRAL:       { cls: "neutral",        label: "— Neutral" },
-      UNVERIFIED:    { cls: "unverified",     label: "◈ Unverified" },
-    };
-    const badgeDef = BADGE_MAP[classification] || BADGE_MAP.NEUTRAL;
+    const isConsistent = rep.verdict?.is_consistent;
+    const label = (rep.verdict?.label || "").toUpperCase();
+    
+    let badgeDef = { cls: "neutral", label: "— Neutral" };
+    if (isConsistent === false || label.includes("CONTRADICT")) {
+      badgeDef = { cls: "contradiction", label: "🚨 Contradiction" };
+    } else if (isConsistent === true || label.includes("CONSISTENT")) {
+      badgeDef = { cls: "consistent", label: "✓ Consistent" };
+    } else if (rep.pipeline_status && rep.pipeline_status.includes("unverified")) {
+      badgeDef = { cls: "unverified", label: "◈ Unverified" };
+    }
 
     const block = document.createElement("div");
     block.className = "verdict-report";
 
     // Topic tag
-    if (rep.topic) {
+    if (rep.new_claim?.topic) {
       const tag = document.createElement("span");
       tag.className = "topic-tag";
-      tag.textContent = rep.topic.toUpperCase();
+      tag.textContent = rep.new_claim.topic.toUpperCase();
       block.appendChild(tag);
     }
 
     // Claim text + per-claim verdict badge — side-by-side in a flex row
-    if (rep.claim) {
+    if (rep.new_claim?.statement) {
       const claimRow = document.createElement("div");
       claimRow.className = "claim-row";
 
       const claimText = document.createElement("div");
       claimText.className = "claim-text";
-      claimText.textContent = rep.claim;
+      claimText.textContent = rep.new_claim.statement;
 
       const claimBadge = document.createElement("span");
       claimBadge.className = `claim-verdict-badge ${badgeDef.cls}`;
@@ -280,7 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Collapsible historical comparison (12.2.a)
-    if (rep.historical_claim) {
+    if (rep.historical_claim?.statement) {
       const details = document.createElement("details");
       details.className = "historical-block";
 
@@ -290,27 +288,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const quote = document.createElement("blockquote");
       quote.className = "historical-quote";
-      quote.textContent = rep.historical_claim;
+      quote.textContent = rep.historical_claim.statement;
       details.appendChild(quote);
 
       block.appendChild(details);
     }
 
     // Numeric diff badge (12.2.a — only for numeric claims)
-    if (rep.numerical_diff) {
-      const absVal = rep.numerical_diff.absolute_diff;
-      const percentVal = rep.numerical_diff.percentage_diff;
-      const isPositive = typeof absVal === "number" ? absVal > 0 : null;
+    if (rep.verdict?.type === "numeric" && rep.verdict.absolute_drift !== undefined) {
+      const absVal = rep.verdict.absolute_drift;
+      const percentVal = rep.verdict.percentage_variance;
+      const isPositive = absVal > 0;
 
       let diffClass = "neutral-diff";
       let diffSign  = "";
-      if (isPositive === true)  { diffClass = "positive"; diffSign = "+"; }
-      if (isPositive === false) { diffClass = "negative"; diffSign = "−"; }
+      if (isPositive)  { diffClass = "positive"; diffSign = "+"; }
+      if (!isPositive && absVal !== 0) { diffClass = "negative"; diffSign = "−"; }
 
       const diffBadge = document.createElement("div");
       diffBadge.className = `diff-badge ${diffClass}`;
 
-      let diffText = `Δ ${diffSign}${absVal}`;
+      let diffText = `Δ ${diffSign}${Math.abs(absVal).toFixed(1)}`;
       if (percentVal !== undefined && percentVal !== null) {
         diffText += ` (${diffSign}${Math.abs(percentVal).toFixed(1)}%)`;
       }
@@ -319,10 +317,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Explanation (12.2.a)
-    if (rep.explanation) {
+    if (rep.verdict?.explanation) {
       const explain = document.createElement("div");
       explain.className = "log-explanation";
-      explain.textContent = rep.explanation;
+      explain.textContent = rep.verdict.explanation;
       block.appendChild(explain);
     }
 
@@ -342,18 +340,20 @@ document.addEventListener("DOMContentLoaded", () => {
     logs.forEach((log) => {
       if (log.report === null) {
         analyzing++;
-      } else if (Array.isArray(log.report) && log.report.length === 0) {
+      } else if (log.report.pipeline_status === "no_claim") {
+        // ignore in stats
+      } else if (log.report.pipeline_status && log.report.pipeline_status.includes("unverified")) {
         unverified++;
-      } else if (Array.isArray(log.report)) {
-        const hasContradiction = log.report.some(
-          (r) => (r.classification || "").toUpperCase() === "CONTRADICTION"
-        );
-        const hasConsistent = log.report.some(
-          (r) => (r.classification || "").toUpperCase() === "CONSISTENT"
-        );
-        if (hasContradiction) contradictions++;
-        else if (hasConsistent) consistent++;
-        else unverified++;
+      } else {
+        const isConsistent = log.report.verdict?.is_consistent;
+        const label = (log.report.verdict?.label || "").toUpperCase();
+        if (isConsistent === false || label.includes("CONTRADICT")) {
+          contradictions++;
+        } else if (isConsistent === true || label.includes("CONSISTENT")) {
+          consistent++;
+        } else {
+          unverified++;
+        }
       }
     });
 

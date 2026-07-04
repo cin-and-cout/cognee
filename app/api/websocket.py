@@ -71,7 +71,7 @@ async def websocket_live_speech(websocket: WebSocket):
                     politician_party="Progressive Coalition", # We can look this up in the future
                     speaker_confidence=speaker_confidence,
                 )
-                if report:
+                if report and report.get("pipeline_status") != "no_claim":
                     logger.info(
                         "✅ [ws] Pipeline complete — verdict: %s, topic: %s",
                         report.get("verdict", {}).get("label", "unknown"),

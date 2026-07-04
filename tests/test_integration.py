@@ -74,6 +74,7 @@ async def test_orchestrator_numeric_flow(
     assert report["historical_claim"]["statement"] == "Inflation was 4.0%."
     assert report["verdict"]["is_consistent"] is False
     assert report["verdict"]["type"] == "numeric"
+    assert report["pipeline_status"] == "compared_added"
 
     mock_extract.assert_called_once()
     mock_get_hist.assert_called_once_with("Inflation", politician_name="Governor Vance")
@@ -143,6 +144,7 @@ async def test_orchestrator_qualitative_flow(
     assert report["historical_claim"]["statement"] == ("We plan to freeze passenger fares.")
     assert report["verdict"]["label"] == "Consistent with prior statements"
     assert report["verdict"]["type"] == "qualitative"
+    assert report["pipeline_status"] == "compared_added"
 
     mock_extract.assert_called_once()
     mock_get_hist.assert_called_once_with("Transit", politician_name="Governor Vance")
@@ -190,6 +192,7 @@ async def test_orchestrator_low_confidence_skips_ingestion(
     )
 
     assert report is not None
+    assert report["pipeline_status"] == "skipped_unverified"
     mock_add_data_points.assert_not_called()
     mock_add.assert_not_called()
     mock_cognify.assert_not_called()

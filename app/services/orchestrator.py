@@ -20,7 +20,7 @@ async def process_incoming_sentence(
     claim_date: str,
     politician_party: Optional[str] = None,
     speaker_confidence: str = "low",
-) -> Optional[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Orchestrates the entire claim consistency pipeline for a single speech sentence:
       1. Extracts a structured claim (if present).
@@ -51,7 +51,9 @@ async def process_incoming_sentence(
 
     if not new_claim:
         logger.info("🤷 [orchestrator] No claim extracted from sentence")
-        return None
+        report = {"pipeline_status": "no_claim"}
+        set_cached_verdict(text, report)
+        return report
     logger.info("🎯 [orchestrator] Claim extracted: topic='%s', is_numeric=%s", new_claim.topic.name, new_claim.is_numeric)
 
     # 2. Retrieve historical claims for the topic
@@ -106,8 +108,10 @@ async def process_incoming_sentence(
     if should_persist:
         asyncio.create_task(run_ingestion())
         logger.info("💾 [orchestrator] Queued claim ingestion (speaker_confidence=%s)", speaker_confidence)
+        pipeline_status = "compared_added" if latest_historical else "added_unverified"
     else:
         logger.info("⚠️ [orchestrator] Skipping ingestion — speaker_confidence='%s' (Unknown Speaker)", speaker_confidence)
+        pipeline_status = "compared_skipped" if latest_historical else "skipped_unverified"
     # Yield control to event loop so background task can start executing
     await asyncio.sleep(0.001)
 
@@ -135,6 +139,7 @@ async def process_incoming_sentence(
             else None
         ),
         "verdict": verdict,
+        "pipeline_status": pipeline_status,
     }
 
     # Save to cache
