@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `master`
+*   **Current Branch:** `feature/milestone-10-buffer-first-extraction`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -36,7 +36,7 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 6.3: Chrome Side Panel UI & Neobrutalist Alerts.
     *   [x] Task 6.4: Live DOM Caption Scraper & Web Audio Capturer Integration.
     *   [x] Task 6.5: Decommission Old Web Dashboard & Auto-Open Scripting.
-*   **Next Priority:** Task 7.1 (Configure Gemini LLM & Embedding Settings).
+*   **Next Priority:** Task 7.1 (Configure Gemini LLM & Embedding Settings) — Milestone 10 complete.
 
 ---
 
@@ -176,3 +176,127 @@ If you are picking up this project, please follow these instructions:
   - **Focus:** Extension / Background Worker
   - **Description:** Add a periodic 5-second heartbeat timer to `StreamBuffer` that flushes whatever remains in the buffer if no new chunks have arrived. This handles the edge case where the last words of a video/segment never get flushed because no new chunk arrives to trigger the adaptive timeout. The heartbeat should reset whenever a new chunk arrives.
   - **Verification:** Pause a YouTube video mid-sentence; confirm the partial buffer is flushed within 5 seconds rather than being lost.
+
+---
+
+### Milestone 10: Buffer-First Word Accumulation & Pause-Based Sentence Extraction (Must Have)
+
+- [x] **[Task 10.1] Global Word Buffer in `content.js`**
+  - **Focus:** Extension / DOM Scripting
+  - **Branch:** `feature/milestone-10-buffer-first-extraction`
+  - **Description:** Maintain a flat, append-only `globalWordBuffer: string[]` in `content.js` that is the canonical truth for every word ever seen from captions in a session. Attach a snapshot of the last 100 words to every `CAPTION_CHUNK` message so `background.js` can cross-reference during segmentation.
+  - **Sub-tasks:**
+    - [x] **10.1.a** Add a `globalWordBuffer: string[]` array at module-top scope in `content.js` (no cap — it is the full session log).
+    - [x] **10.1.b** In `processCaptions()`, after computing `newWords` via `computeNewWords()`, **append** `newWords` to `globalWordBuffer` (accumulate only; never replace).
+    - [x] **10.1.c** Change the `CAPTION_CHUNK` message payload to include `text` (the delta chunk) and `bufferSnapshot` (last 100 words of `globalWordBuffer` joined as a string) so `background.js` can cross-reference.
+    - [x] **10.1.d** Add a `resetBuffer()` function that clears both `globalWordBuffer` and `previousWords`, called on YouTube's `yt-navigate-finish` document event (video navigation).
+    - [x] **10.1.e** Write a unit-test script (in `tests/` or extension `__tests__/`) that replays a mock caption mutation sequence and verifies the buffer accumulates with zero duplicates across caption window transitions.
+  - **Verification:** Open browser console on any YouTube video with auto-captions. Log `globalWordBuffer` every 10 seconds. Confirm it is a growing, deduplicated flat word list with zero repetition across caption window transitions.
+
+- [x] **[Task 10.2] Pause-Aware Sentence Extraction from Buffer (No-Punctuation Path)**
+  - **Focus:** Extension / Background Worker
+  - **Branch:** `feature/milestone-10-buffer-first-extraction`
+  - **Description:** Make `StreamBuffer`'s adaptive timeout semantically a *pause detector*. When it fires, cross-reference the `bufferSnapshot` from the last `CAPTION_CHUNK` to verify whether a clause boundary is plausible before flushing. Remove the redundant per-chunk dedup in `content.js` since the Global Word Ledger is strictly more powerful.
+  - **Sub-tasks:**
+    - [x] **10.2.a** Rename the existing `flushTimer` / "adaptive timeout" in `StreamBuffer` to `pauseDetectionTimer` throughout the class for semantic clarity. Keep the same clamped [800ms–3000ms] range.
+    - [x] **10.2.b** Store the `bufferSnapshot` string from the latest `CAPTION_CHUNK` message in a `StreamBuffer.lastSnapshot` property. When `pauseDetectionTimer` fires, compare the snapshot's word count to the internal buffer's word count — if they match, treat it as a confirmed pause and flush immediately; otherwise allow one heartbeat deferral before force-flushing.
+    - [x] **10.2.c** Add a `lastChunkArrival: number` timestamp to `StreamBuffer`. If the gap since `lastChunkArrival` exceeds 1.5× the computed `pauseDetectionTimer` value, treat it as a hard pause and force-flush regardless (no deferral).
+    - [x] **10.2.d** Remove the redundant `isDuplicate()` / `recentChunks` rolling window in `content.js`. The `emittedWords` Global Word Ledger in `background.js` supersedes this dedup layer entirely.
+    - [x] **10.2.e** Add a `StreamBuffer.stats()` method returning `{ bufferWords, emittedTotal, wps, lastFlushMethod }` for debugging from the `background.js` service-worker console.
+  - **Verification:** Play a slow speaker (e.g., a lecture). Confirm sentences flush at natural speech pauses. Play a fast news debate; confirm no single sentence exceeds 40 words. Neither path should produce repeated words.
+
+---
+
+### Milestone 11: Pre-Created Transcript Extraction (Should Have)
+
+- [ ] **[Task 11.1] Transcript Availability Detection & Scraping in `content.js`**
+  - **Focus:** Extension / DOM Scripting
+  - **Branch:** `feature/11.1-transcript-detection`
+  - **Description:** On page load (and on `yt-navigate-finish`), detect whether the video has a human-authored transcript by looking for YouTube's "Show transcript" button. If found, programmatically open the transcript panel, scrape all segments, and send them as a `FULL_TRANSCRIPT` message to `background.js`. Pause the live caption observer so captions and transcript are not double-processed.
+  - **Sub-tasks:**
+    - [ ] **11.1.a** On page load and `yt-navigate-finish`, probe for the transcript trigger button via `document.querySelector('[aria-label="Show transcript"]')` (or nearest stable equivalent). Retry up to 3× with a 1-second delay to handle late DOM rendering.
+    - [ ] **11.1.b** If a transcript button is found, send a `TRANSCRIPT_AVAILABLE` message to `background.js` with `{ videoId }` extracted from `window.location.href`.
+    - [ ] **11.1.c** Implement `clickTranscriptAndScrape()`: programmatically click the button, wait up to 3 seconds for `ytd-transcript-segment-renderer` elements to appear (via `MutationObserver`), then collect all `{ text, startMs }` segments from the panel.
+    - [ ] **11.1.d** Send the collected data as `{ action: "FULL_TRANSCRIPT", segments: [{ text, startMs }], videoId }` to `background.js`.
+    - [ ] **11.1.e** After sending, post a `DISABLE_CAPTION_SCRAPER` message to `background.js` and also disconnect the local caption `MutationObserver` for this video to prevent parallel processing.
+  - **Verification:** Open a TED Talk YouTube video (which always has a human transcript). Confirm `FULL_TRANSCRIPT` arrives in `background.js` console within 5 seconds of page load. Confirm the caption observer produces no `CAPTION_CHUNK` messages in parallel.
+
+- [ ] **[Task 11.2] Full Transcript Processing Pipeline in `background.js`**
+  - **Focus:** Extension / Background Worker
+  - **Branch:** `feature/11.2-transcript-pipeline`
+  - **Description:** When a `FULL_TRANSCRIPT` message is received, split the transcript into sentences using the existing rule-based punctuation splitter (extracted as a shared utility), deduplicate via the Global Word Ledger, and send sentences to the backend. Add a `transcriptMode` flag and expose a UI badge in the side panel.
+  - **Sub-tasks:**
+    - [ ] **11.2.a** Extract `StreamBuffer._tryRuleBasedSplit()` logic into a standalone top-level utility function `splitIntoSentences(text: string): string[]` in `background.js` to avoid duplication between transcript and live modes.
+    - [ ] **11.2.b** Add a `transcriptMode: boolean` flag to `chrome.storage.local`. Set to `true` on `TRANSCRIPT_AVAILABLE`; reset to `false` on `yt-navigate-finish` or `DISABLE_CAPTION_SCRAPER`.
+    - [ ] **11.2.c** Implement `processFullTranscript(segments)` in `background.js`:
+      - Concatenate all segment texts with a single space.
+      - Call `splitIntoSentences()` to produce an ordered array of sentences.
+      - Run each sentence through the Global Word Ledger dedup (`streamBuffer._stripOverlapWithLedger()`).
+      - Send each non-duplicate sentence via `handleSegmentedSentence()`.
+    - [ ] **11.2.d** Wire up `FULL_TRANSCRIPT` in the `chrome.runtime.onMessage.addListener` block to call `processFullTranscript()`.
+    - [ ] **11.2.e** Add a `TRANSCRIPT_MODE_STATUS` query message handler that `sidepanel.js` can poll on load to conditionally show a `📄 Using Pre-built Transcript` badge in the UI.
+  - **Verification:** On a TED Talk, confirm all sentences are extracted with correct punctuation splits and sent to the backend in order. Confirm the side panel feed displays them correctly. Confirm `StreamBuffer` stays idle (no `CAPTION_CHUNK` handled) during transcript mode.
+
+---
+
+### Milestone 12: Extension UX Polish (Should Have)
+
+- [ ] **[Task 12.1] Clear Button for Live Transcript Feed**
+  - **Focus:** Extension / Side Panel UI
+  - **Branch:** `feature/12.1-clear-transcript-button`
+  - **Description:** Add a "Clear Feed" button to `sidepanel.html` that wipes the display log, resets `StreamBuffer` state, and shows a brief undo snackbar — without disconnecting the WebSocket.
+  - **Sub-tasks:**
+    - [ ] **12.1.a** Add `<button id="clear-btn" class="btn btn-secondary">Clear Feed</button>` to `sidepanel.html`, positioned between the Connect button and the feed container. Style it with a white background / black border neobrutalist theme (visually distinct from the red Connect button).
+    - [ ] **12.1.b** In `sidepanel.js`, add a click handler for `#clear-btn` that calls `chrome.storage.local.set({ logs: [] })` then immediately re-renders the feed to the empty state. The WebSocket connection and `StreamBuffer` processing must remain active.
+    - [ ] **12.1.c** Send a `CLEAR_BUFFER` message to `background.js` on clear. In `background.js`, handle it by calling `streamBuffer.reset()` so the Global Word Ledger and buffer state are wiped — prevents previously emitted words from blocking new sentences.
+    - [ ] **12.1.d** Show a 2-second "Feed cleared" undo snackbar (neobrutalist style: black box, white monospaced text, box-shadow) after clicking Clear. The undo action restores the previous `logs` from a pre-clear snapshot stored in memory.
+    - [ ] **12.1.e** Persist a `{ clearedAt: timestamp }` entry in `chrome.storage.local` on each clear for debugging / session analytics.
+  - **Verification:** During an active session with 10+ feed items, click Clear. Confirm all items vanish and the empty state renders. Confirm the WebSocket stays connected and new sentences continue arriving and displaying correctly after the clear.
+
+- [ ] **[Task 12.2] Enhanced Verdict UI Per Claim**
+  - **Focus:** Extension / Side Panel UI
+  - **Branch:** `feature/12.2-verdict-ui`
+  - **Description:** Redesign the per-claim verdict card in `sidepanel.html` / `sidepanel.js` to surface all available backend report fields clearly. Add 4 distinct verdict states, a loading/analyzing state, collapsible historical comparison, numeric diff badge, and a global stats bar.
+  - **Sub-tasks:**
+    - [ ] **12.2.a** Define the full verdict card CSS in `sidepanel.html` with these visual components:
+      - **Verdict badge** (top-right pill): `CONSISTENT` (green `#2ed573`) / `CONTRADICTION` (red `#ff5252`) / `NEUTRAL` (grey `#f1f2f6`) / `UNVERIFIED` (amber `#ffa502`).
+      - **Claim text** (bold, full-width).
+      - **Topic tag** (small uppercase pill beneath claim text).
+      - **Historical comparison** (collapsible `<details>/<summary>` block): matched historical claim shown in a bordered quote.
+      - **Diff badge** (only for numeric claims): `Δ +X.X%` or `Δ -X.X%` with directional color.
+      - **Explanation** (italic text, below comparison).
+      - **Timestamp** (bottom-right, small monospaced).
+    - [ ] **12.2.b** Rewrite `renderFeed()` in `sidepanel.js` to use the new card template, replacing the current flat `verdict-box` HTML.
+    - [ ] **12.2.c** Add a `⏳ Analyzing...` pulsing badge for log items where `log.report === null` (sentence captured but backend response not yet received).
+    - [ ] **12.2.d** Add `UNVERIFIED` as a distinct state for items where the backend returned an empty report array (no historical match found in graph memory).
+    - [ ] **12.2.e** Add a global stats bar pinned above the feed: `N sentences | X contradictions | Y consistent | Z unverified` — updated in real-time on every `NEW_LOG` message.
+  - **Verification:** Inject mock log data covering all 4 verdict states into `chrome.storage.local`. Open the side panel and confirm each card renders with correct color, fields, and layout. Confirm the `⏳ Analyzing...` state appears immediately on sentence capture and transitions to a verdict when the backend responds.
+
+---
+
+### Milestone 13: Speaker Attribution — Research & Prototype (Could Have)
+
+- [ ] **[Task 13.1] Speaker Detection Architecture Research & ADR**
+  - **Focus:** Research / Architecture
+  - **Branch:** `feature/13.1-speaker-detection-research`
+  - **Description:** Research and document all viable approaches to detecting who is speaking from a YouTube video, then produce an Architecture Decision Record. Also future-proof the `Claim` schema with a `speaker` field.
+  - **Sub-tasks:**
+    - [ ] **13.1.a** Research YouTube transcript speaker labels: check whether `ytd-transcript-segment-renderer` includes `[Speaker: Name]` markers for live streams vs VODs vs auto-generated captions. Document findings with example video IDs.
+    - [ ] **13.1.b** Research on-screen lower-third / chyron detection: document how speaker name overlays appear in the YouTube player DOM (`yt-formatted-string`, `#movie_player` overlays) and whether they are readable without OCR.
+    - [ ] **13.1.c** Evaluate `pyannote/speaker-diarization` as a backend approach: audio download → diarization → `{ speakerLabel, startMs, endMs }[]` timeline → align with caption timestamps. Document latency, cost, and live-stream feasibility.
+    - [ ] **13.1.d** Evaluate the LLM-from-title heuristic: at session start, call an LLM with the video title + description to identify the primary speaker(s). Store result in `chrome.storage.local` as `{ speakers: string[] }`. Document accuracy vs cost vs simplicity trade-offs.
+    - [ ] **13.1.e** Write `ADR-004-speaker-attribution.md` in the project root documenting the chosen approach, trade-offs, and fallback strategy (e.g., `"Unknown Speaker"`).
+    - [ ] **13.1.f** Add `speaker: Optional[str] = None` to the `Claim` model in `app/schemas.py`. Update `app/api/websocket.py` to read `speaker` from the incoming WebSocket JSON payload and pass it through to `process_incoming_sentence()`. Run `pytest tests/test_schemas.py` to confirm no regressions.
+  - **Verification:** `ADR-004` is committed. `pytest tests/test_schemas.py` passes with the updated `Claim` schema. No runtime behavior changes for existing sessions.
+
+- [ ] **[Task 13.2] Lower-Third / Chyron Scraper Prototype**
+  - **Focus:** Extension / DOM Scripting + Backend
+  - **Branch:** `feature/13.2-chyron-scraper`
+  - **Description:** Implement the lightweight browser-side speaker detector as a prototype: watch for YouTube player overlay text (lower-third graphics / chyrons) that news broadcasts display, parse the speaker name, and thread it through the entire pipeline from `content.js` → `background.js` → WebSocket → backend.
+  - **Sub-tasks:**
+    - [ ] **13.2.a** In `content.js`, add a `chyronObserver` (separate `MutationObserver` instance from the caption observer) watching `#movie_player` for mutations in `yt-formatted-string` or overlay elements. Store the most-recently-seen chyron text in `currentSpeaker: string | null`.
+    - [ ] **13.2.b** Parse chyron text with a regex to extract a speaker name (e.g., `FIRSTNAME LASTNAME` pattern on the first line, ignoring title/role lines). Ignore matches shorter than 4 characters or containing only all-caps single words (these are likely channel names).
+    - [ ] **13.2.c** Attach `speaker: currentSpeaker` to every `CAPTION_CHUNK` message payload: `{ action: "CAPTION_CHUNK", text, bufferSnapshot, speaker }`.
+    - [ ] **13.2.d** In `background.js`, thread the `speaker` argument through `handleSegmentedSentence(text, speaker)` and include it in the outgoing WebSocket JSON: `{ sentence, speaker }`.
+    - [ ] **13.2.e** In `app/api/websocket.py`, read `speaker = data.get("speaker")` from the incoming JSON and pass it to `process_incoming_sentence()` as the `politician_name` parameter when non-null, otherwise fall back to `"Unknown Speaker"`.
+  - **Verification:** Open a CNN YouTube live stream that shows lower-third name graphics. Confirm `currentSpeaker` in the console correctly updates when a new speaker is shown on-screen. Confirm the `speaker` field appears in the WebSocket payload logged by the backend.
