@@ -71,11 +71,12 @@ async def websocket_live_speech(websocket: WebSocket):
                     politician_party="Progressive Coalition", # We can look this up in the future
                     speaker_confidence=speaker_confidence,
                 )
-                logger.info(
-                    "✅ [ws] Pipeline complete — verdict: %s, topic: %s",
-                    report.get("verdict", {}).get("label", "unknown"),
-                    report.get("new_claim", {}).get("topic", "unknown")
-                )
+                if report:
+                    logger.info(
+                        "✅ [ws] Pipeline complete — verdict: %s, topic: %s",
+                        report.get("verdict", {}).get("label", "unknown"),
+                        report.get("new_claim", {}).get("topic", "unknown")
+                    )
             except Exception as e:
                 logger.exception("❌ [ws] Error processing sentence: %s", sentence)
                 raise e
