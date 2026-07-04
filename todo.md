@@ -15,7 +15,7 @@ If you are picking up this project, please follow these instructions:
 ---
 
 ## 2. Current Project State
-*   **Current Branch:** `feature/milestone-10-buffer-first-extraction`
+*   **Current Branch:** `feature/12.2-verdict-ui`
 *   **Python Virtual Environment:** Fully initialized in `.venv/` with all dependencies installed.
 *   **Completed Work:** 
     *   [x] Task 1.1: Project environment initialization, directory structure, Ruff configuration, and dependency setup.
@@ -36,7 +36,7 @@ If you are picking up this project, please follow these instructions:
     *   [x] Task 6.3: Chrome Side Panel UI & Neobrutalist Alerts.
     *   [x] Task 6.4: Live DOM Caption Scraper & Web Audio Capturer Integration.
     *   [x] Task 6.5: Decommission Old Web Dashboard & Auto-Open Scripting.
-*   **Next Priority:** Task 7.1 (Configure Gemini LLM & Embedding Settings) — Milestone 10 complete.
+*   **Next Priority:** Task 11.1 (Transcript Availability Detection) — Milestone 12 complete.
 
 ---
 
@@ -241,24 +241,24 @@ If you are picking up this project, please follow these instructions:
 
 ### Milestone 12: Extension UX Polish (Should Have)
 
-- [ ] **[Task 12.1] Clear Button for Live Transcript Feed**
+- [x] **[Task 12.1] Clear Button for Live Transcript Feed**
   - **Focus:** Extension / Side Panel UI
   - **Branch:** `feature/12.1-clear-transcript-button`
   - **Description:** Add a "Clear Feed" button to `sidepanel.html` that wipes the display log, resets `StreamBuffer` state, and shows a brief undo snackbar — without disconnecting the WebSocket.
   - **Sub-tasks:**
-    - [ ] **12.1.a** Add `<button id="clear-btn" class="btn btn-secondary">Clear Feed</button>` to `sidepanel.html`, positioned between the Connect button and the feed container. Style it with a white background / black border neobrutalist theme (visually distinct from the red Connect button).
-    - [ ] **12.1.b** In `sidepanel.js`, add a click handler for `#clear-btn` that calls `chrome.storage.local.set({ logs: [] })` then immediately re-renders the feed to the empty state. The WebSocket connection and `StreamBuffer` processing must remain active.
-    - [ ] **12.1.c** Send a `CLEAR_BUFFER` message to `background.js` on clear. In `background.js`, handle it by calling `streamBuffer.reset()` so the Global Word Ledger and buffer state are wiped — prevents previously emitted words from blocking new sentences.
-    - [ ] **12.1.d** Show a 2-second "Feed cleared" undo snackbar (neobrutalist style: black box, white monospaced text, box-shadow) after clicking Clear. The undo action restores the previous `logs` from a pre-clear snapshot stored in memory.
-    - [ ] **12.1.e** Persist a `{ clearedAt: timestamp }` entry in `chrome.storage.local` on each clear for debugging / session analytics.
+    - [x] **12.1.a** Add `<button id="clear-btn" class="btn btn-secondary">Clear Feed</button>` to `sidepanel.html`, positioned between the Connect button and the feed container. Style it with a white background / black border neobrutalist theme (visually distinct from the red Connect button).
+    - [x] **12.1.b** In `sidepanel.js`, add a click handler for `#clear-btn` that calls `chrome.storage.local.set({ logs: [] })` then immediately re-renders the feed to the empty state. The WebSocket connection and `StreamBuffer` processing must remain active.
+    - [x] **12.1.c** Send a `CLEAR_BUFFER` message to `background.js` on clear. In `background.js`, handle it by calling `streamBuffer.reset()` so the Global Word Ledger and buffer state are wiped — prevents previously emitted words from blocking new sentences.
+    - [x] **12.1.d** Show a 2-second "Feed cleared" undo snackbar (neobrutalist style: black box, white monospaced text, box-shadow) after clicking Clear. The undo action restores the previous `logs` from a pre-clear snapshot stored in memory.
+    - [x] **12.1.e** Persist a `{ clearedAt: timestamp }` entry in `chrome.storage.local` on each clear for debugging / session analytics.
   - **Verification:** During an active session with 10+ feed items, click Clear. Confirm all items vanish and the empty state renders. Confirm the WebSocket stays connected and new sentences continue arriving and displaying correctly after the clear.
 
-- [ ] **[Task 12.2] Enhanced Verdict UI Per Claim**
+- [x] **[Task 12.2] Enhanced Verdict UI Per Claim**
   - **Focus:** Extension / Side Panel UI
   - **Branch:** `feature/12.2-verdict-ui`
   - **Description:** Redesign the per-claim verdict card in `sidepanel.html` / `sidepanel.js` to surface all available backend report fields clearly. Add 4 distinct verdict states, a loading/analyzing state, collapsible historical comparison, numeric diff badge, and a global stats bar.
   - **Sub-tasks:**
-    - [ ] **12.2.a** Define the full verdict card CSS in `sidepanel.html` with these visual components:
+    - [x] **12.2.a** Define the full verdict card CSS in `sidepanel.html` with these visual components:
       - **Verdict badge** (top-right pill): `CONSISTENT` (green `#2ed573`) / `CONTRADICTION` (red `#ff5252`) / `NEUTRAL` (grey `#f1f2f6`) / `UNVERIFIED` (amber `#ffa502`).
       - **Claim text** (bold, full-width).
       - **Topic tag** (small uppercase pill beneath claim text).
@@ -266,10 +266,10 @@ If you are picking up this project, please follow these instructions:
       - **Diff badge** (only for numeric claims): `Δ +X.X%` or `Δ -X.X%` with directional color.
       - **Explanation** (italic text, below comparison).
       - **Timestamp** (bottom-right, small monospaced).
-    - [ ] **12.2.b** Rewrite `renderFeed()` in `sidepanel.js` to use the new card template, replacing the current flat `verdict-box` HTML.
-    - [ ] **12.2.c** Add a `⏳ Analyzing...` pulsing badge for log items where `log.report === null` (sentence captured but backend response not yet received).
-    - [ ] **12.2.d** Add `UNVERIFIED` as a distinct state for items where the backend returned an empty report array (no historical match found in graph memory).
-    - [ ] **12.2.e** Add a global stats bar pinned above the feed: `N sentences | X contradictions | Y consistent | Z unverified` — updated in real-time on every `NEW_LOG` message.
+    - [x] **12.2.b** Rewrite `renderFeed()` in `sidepanel.js` to use the new card template, replacing the current flat `verdict-box` HTML.
+    - [x] **12.2.c** Add a `⏳ Analyzing...` pulsing badge for log items where `log.report === null` (sentence captured but backend response not yet received).
+    - [x] **12.2.d** Add `UNVERIFIED` as a distinct state for items where the backend returned an empty report array (no historical match found in graph memory).
+    - [x] **12.2.e** Add a global stats bar pinned above the feed: `N sentences | X contradictions | Y consistent | Z unverified` — updated in real-time on every `NEW_LOG` message.
   - **Verification:** Inject mock log data covering all 4 verdict states into `chrome.storage.local`. Open the side panel and confirm each card renders with correct color, fields, and layout. Confirm the `⏳ Analyzing...` state appears immediately on sentence capture and transitions to a verdict when the backend responds.
 
 ---
