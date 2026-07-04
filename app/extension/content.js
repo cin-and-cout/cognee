@@ -214,14 +214,10 @@ function waitForTranscriptSegments(container, timeoutMs = 3000) {
   });
 }
 
-/**
- * Scrape all transcript segments from the open transcript panel.
- *
- * @returns {{ text: string, startMs: number }[]}
- */
 function scrapeTranscriptSegments() {
   const segmentEls = document.querySelectorAll("ytd-transcript-segment-renderer");
   const segments   = [];
+  let emptyCount   = 0;
 
   segmentEls.forEach((el) => {
     const textEl      = el.querySelector(".segment-text");
@@ -230,8 +226,20 @@ function scrapeTranscriptSegments() {
     const text    = textEl      ? textEl.textContent.trim()      : "";
     const startMs = timestampEl ? parseTimestampMs(timestampEl.textContent) : 0;
 
-    if (text) segments.push({ text, startMs });
+    if (text) {
+      segments.push({ text, startMs });
+    } else {
+      emptyCount++;
+    }
   });
+
+  console.log(`[content.js] 📊 Scraped ${segmentEls.length} segments. ${emptyCount} empty texts discarded.`);
+  if (segments.length > 0) {
+    const totalChars = segments.reduce((sum, s) => sum + s.text.length, 0);
+    console.log(`[content.js] 📊 Total scraped characters: ${totalChars}`);
+    console.log(`[content.js] 📊 First 3:`, segments.slice(0, 3).map(s => s.text));
+    console.log(`[content.js] 📊 Last 3:`, segments.slice(-3).map(s => s.text));
+  }
 
   return segments;
 }

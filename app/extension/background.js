@@ -534,18 +534,21 @@ function splitIntoSentences(text) {
         if (remaining.trim()) sentences.push(remaining.trim());
         break;
       }
+      console.log(`[bg] ⏩ splitIntoSentences: Skipping split at "${candidate}" (< 4 words)`);
       remaining = remaining.substring(match.index + 1);
       continue;
     }
 
     const lastWord = words[words.length - 1].replace(/[.!?]+$/, "").toLowerCase();
     if (_SPLIT_ABBREVIATIONS.has(lastWord)) {
+      console.log(`[bg] ⏩ splitIntoSentences: Skipping split at abbreviation "${lastWord}"`);
       remaining = remaining.substring(match.index + 1);
       continue;
     }
 
     // Skip decimal numbers like "3.5"
     if (/\d\.\d/.test(candidate.slice(-6))) {
+      console.log(`[bg] ⏩ splitIntoSentences: Skipping split at decimal in "${candidate.slice(-6)}"`);
       remaining = remaining.substring(match.index + 1);
       continue;
     }
@@ -554,6 +557,7 @@ function splitIntoSentences(text) {
     remaining = remaining.substring(splitIndex).trim();
   }
 
+  console.log(`[bg] 🔪 splitIntoSentences: Produced ${sentences.length} sentences from ${text.length} chars.`);
   return sentences;
 }
 
@@ -719,6 +723,7 @@ function _attachReportToLog(text, report, attempt) {
 
     if (existingLog) {
       // Found — attach the report and persist
+      console.log(`[bg] 🔗 _attachReportToLog: Attached report to entry (attempt ${attempt + 1}). Topic: ${report?.new_claim?.topic}`);
       existingLog.report = report;
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
@@ -760,30 +765,17 @@ function processFullTranscript(segments) {
   }
 
   const fullText  = segments.map((s) => s.text).join(" ");
+  console.log(`[bg] 📄 processFullTranscript: Received ${segments.length} segments, total ${fullText.length} chars. Sample: "${fullText.substring(0, 200)}..."`);
   const sentences = splitIntoSentences(fullText);
 
   console.log(`[bg] 📄 Transcript: split into ${sentences.length} sentences.`);
 
   sentences.forEach((sentence, i) => {
-    const words    = sentence.trim().split(/\s+/);
-    const dedupedW = streamBuffer._stripOverlapWithLedger(words);
-
-    if (dedupedW.length === 0) {
-      console.log(`[bg] 📄 Transcript sentence [${i + 1}/${sentences.length}] suppressed (duplicate).`);
-      return;
-    }
-
-    // Append to ledger so subsequent sentences don't repeat these words
-    streamBuffer.emittedWords.push(...dedupedW);
-    if (streamBuffer.emittedWords.length > streamBuffer.MAX_LEDGER_WORDS) {
-      streamBuffer.emittedWords = streamBuffer.emittedWords.slice(
-        streamBuffer.emittedWords.length - streamBuffer.MAX_LEDGER_WORDS
-      );
-    }
-
-    const dedupedSentence = dedupedW.join(" ");
-    console.log(`[bg] 📄 Transcript sentence [${i + 1}/${sentences.length}]: "${dedupedSentence}"`);
-    handleSegmentedSentence(dedupedSentence);
+    const trimmed = sentence.trim();
+    if (!trimmed) return;
+    
+    console.log(`[bg] 📄 Transcript sentence [${i + 1}/${sentences.length}] (${trimmed.split(/\s+/).length} words): "${trimmed}"`);
+    handleSegmentedSentence(trimmed);
   });
 }
 
@@ -800,7 +792,7 @@ function handleSegmentedSentence(text) {
     socket.send(payload);
     console.log(`[bg] ✉️  Sentence sent to backend: "${cleanText}"`);
   } else {
-    console.log(`[bg] ⚠️  Cannot send — WebSocket not open: "${cleanText}"`);
+    console.log(`[bg] ⚠️  Cannot send — WebSocket not open. Dropping sentence: "${cleanText}"`);
   }
 
   chrome.storage.local.get("logs", (data) => {

@@ -60,12 +60,22 @@ async def websocket_live_speech(websocket: WebSocket):
             recent_hashes.append(sentence_hash)
 
             # Process the incoming live sentence
-            report = await process_incoming_sentence(
-                text=sentence,
-                politician_name="Governor Alexis Vance",
-                claim_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                politician_party="Progressive Coalition",
-            )
+            logger.info("📥 [ws] Received sentence (%d words): %s", word_count, sentence)
+            try:
+                report = await process_incoming_sentence(
+                    text=sentence,
+                    politician_name="Governor Alexis Vance",
+                    claim_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    politician_party="Progressive Coalition",
+                )
+                logger.info(
+                    "✅ [ws] Pipeline complete — verdict: %s, topic: %s",
+                    report.get("verdict", {}).get("label", "unknown"),
+                    report.get("new_claim", {}).get("topic", "unknown")
+                )
+            except Exception as e:
+                logger.exception("❌ [ws] Error processing sentence: %s", sentence)
+                raise e
 
             payload = {
                 "text": sentence,
@@ -78,6 +88,7 @@ async def websocket_live_speech(websocket: WebSocket):
         # Client disconnected cleanly
         pass
     except Exception as e:
+        logger.exception("❌ [ws] Uncaught websocket error:")
         try:
             await websocket.send_json({"error": f"Internal server error: {str(e)}"})
             await websocket.close()

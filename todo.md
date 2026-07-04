@@ -274,29 +274,79 @@ If you are picking up this project, please follow these instructions:
 
 ---
 
-### Milestone 13: Speaker Attribution — Research & Prototype (Could Have)
+### Milestone 13: Speaker Attribution — Layered Strategy (Could Have)
 
-- [ ] **[Task 13.1] Speaker Detection Architecture Research & ADR**
-  - **Focus:** Research / Architecture
-  - **Branch:** `feature/13.1-speaker-detection-research`
-  - **Description:** Research and document all viable approaches to detecting who is speaking from a YouTube video, then produce an Architecture Decision Record. Also future-proof the `Claim` schema with a `speaker` field.
-  - **Sub-tasks:**
-    - [ ] **13.1.a** Research YouTube transcript speaker labels: check whether `ytd-transcript-segment-renderer` includes `[Speaker: Name]` markers for live streams vs VODs vs auto-generated captions. Document findings with example video IDs.
-    - [ ] **13.1.b** Research on-screen lower-third / chyron detection: document how speaker name overlays appear in the YouTube player DOM (`yt-formatted-string`, `#movie_player` overlays) and whether they are readable without OCR.
-    - [ ] **13.1.c** Evaluate `pyannote/speaker-diarization` as a backend approach: audio download → diarization → `{ speakerLabel, startMs, endMs }[]` timeline → align with caption timestamps. Document latency, cost, and live-stream feasibility.
-    - [ ] **13.1.d** Evaluate the LLM-from-title heuristic: at session start, call an LLM with the video title + description to identify the primary speaker(s). Store result in `chrome.storage.local` as `{ speakers: string[] }`. Document accuracy vs cost vs simplicity trade-offs.
-    - [ ] **13.1.e** Write `ADR-004-speaker-attribution.md` in the project root documenting the chosen approach, trade-offs, and fallback strategy (e.g., `"Unknown Speaker"`).
-    - [ ] **13.1.f** Add `speaker: Optional[str] = None` to the `Claim` model in `app/schemas.py`. Update `app/api/websocket.py` to read `speaker` from the incoming WebSocket JSON payload and pass it through to `process_incoming_sentence()`. Run `pytest tests/test_schemas.py` to confirm no regressions.
-  - **Verification:** `ADR-004` is committed. `pytest tests/test_schemas.py` passes with the updated `Claim` schema. No runtime behavior changes for existing sessions.
+> **Strategy:** 4-layer fallback — Transcript Labels → LLM from Title/Description → Frame OCR → "Unknown Speaker"
 
-- [ ] **[Task 13.2] Lower-Third / Chyron Scraper Prototype**
-  - **Focus:** Extension / DOM Scripting + Backend
-  - **Branch:** `feature/13.2-chyron-scraper`
-  - **Description:** Implement the lightweight browser-side speaker detector as a prototype: watch for YouTube player overlay text (lower-third graphics / chyrons) that news broadcasts display, parse the speaker name, and thread it through the entire pipeline from `content.js` → `background.js` → WebSocket → backend.
+---
+
+#### Layer 1 — Transcript Speaker Label Scraping (free, DOM-only)
+
+- [ ] **[Task 13.1] Transcript Segment Speaker Label Parsing**
+  - **Focus:** Extension / DOM Scripting
+  - **Branch:** `feature/13.1-transcript-speaker-labels`
+  - **Description:** When `clickTranscriptAndScrape()` collects transcript segments (Milestone 11.1), check each segment's text for a `[Speaker: Name]:` or `Speaker Name:` prefix regex. Attach the resolved speaker to the segment payload and propagate a `primarySpeaker` field up to `background.js`.
   - **Sub-tasks:**
-    - [ ] **13.2.a** In `content.js`, add a `chyronObserver` (separate `MutationObserver` instance from the caption observer) watching `#movie_player` for mutations in `yt-formatted-string` or overlay elements. Store the most-recently-seen chyron text in `currentSpeaker: string | null`.
-    - [ ] **13.2.b** Parse chyron text with a regex to extract a speaker name (e.g., `FIRSTNAME LASTNAME` pattern on the first line, ignoring title/role lines). Ignore matches shorter than 4 characters or containing only all-caps single words (these are likely channel names).
-    - [ ] **13.2.c** Attach `speaker: currentSpeaker` to every `CAPTION_CHUNK` message payload: `{ action: "CAPTION_CHUNK", text, bufferSnapshot, speaker }`.
-    - [ ] **13.2.d** In `background.js`, thread the `speaker` argument through `handleSegmentedSentence(text, speaker)` and include it in the outgoing WebSocket JSON: `{ sentence, speaker }`.
-    - [ ] **13.2.e** In `app/api/websocket.py`, read `speaker = data.get("speaker")` from the incoming JSON and pass it to `process_incoming_sentence()` as the `politician_name` parameter when non-null, otherwise fall back to `"Unknown Speaker"`.
-  - **Verification:** Open a CNN YouTube live stream that shows lower-third name graphics. Confirm `currentSpeaker` in the console correctly updates when a new speaker is shown on-screen. Confirm the `speaker` field appears in the WebSocket payload logged by the backend.
+    - [ ] **13.1.a** In `content.js`, in `clickTranscriptAndScrape()`, run each segment's `.text` through a regex like `/^\[?([A-Z][a-z]+(?: [A-Z][a-z]+)+)\]?:\s*/` to detect an embedded speaker label. Strip the label from the text before storing.
+    - [ ] **13.1.b** Collect a `speakerMap: { startMs: speakerName }` alongside segments. Attach the resolved `speaker` string (or `null`) to each `{ text, startMs, speaker }` segment object.
+    - [ ] **13.1.c** Derive `primarySpeaker` as the first non-null speaker name seen in the segment list. Include it in the `FULL_TRANSCRIPT` message: `{ action: "FULL_TRANSCRIPT", segments, videoId, primarySpeaker }`.
+    - [ ] **13.1.d** In `background.js`, on `FULL_TRANSCRIPT`, read `primarySpeaker`. If non-null and `currentSpeaker` is still `"Unknown Speaker"`, set `currentSpeaker = primarySpeaker` (confidence: `"high"`). Log clearly: `[bg] 🏷️ Speaker from transcript labels: "${primarySpeaker}"`.
+    - [ ] **13.1.e** Write `docs/ADR-004-speaker-attribution.md` documenting all four layers, rejected alternatives (audio diarization — too slow for live streams), trade-offs, and fallback chain.
+  - **Verification:** Open a YouTube video that has a human transcript with `[Speaker Name]:` markers (e.g., a White House press briefing with multiple speakers). Confirm `primarySpeaker` appears in the `FULL_TRANSCRIPT` message and `currentSpeaker` is updated in `background.js` console.
+
+---
+
+#### Layer 2 — LLM from Video Title + Description (cheap MVP, always works)
+
+- [ ] **[Task 13.2] LLM Speaker Resolver Service (Backend)**
+  - **Focus:** Backend / Services
+  - **Branch:** `feature/13.2-llm-speaker-resolver`
+  - **Description:** Create a new backend service and REST endpoint that accepts a YouTube video title + description snippet and returns the primary speaker name (normalized), confidence level, and full speaker list for multi-speaker videos. Uses the existing `cognee` LLMGateway.
+  - **Sub-tasks:**
+    - [ ] **13.2.a** Create `app/services/speaker_resolver.py`. Define `SpeakerResolution(BaseModel)` with fields: `name: str`, `confidence: Literal["high", "medium", "low"]`, `matched_politician: bool`, `all_speakers: list[str]`.
+    - [ ] **13.2.b** Implement `async def resolve_speaker_from_metadata(title, description, existing_politicians) -> SpeakerResolution`. Prompt the LLM: given title + description (first 500 chars), identify primary speaker and return structured JSON. Use `cognee`'s `LLMGateway.acomplete()`.
+    - [ ] **13.2.c** Add an in-memory cache keyed by `sha256(title + description)` so repeated calls for the same video are free (one LLM call per unique video).
+    - [ ] **13.2.d** Create `app/api/speaker.py` with `router = APIRouter()`. Add `POST /api/resolve-speaker` endpoint accepting `{ title: str, description: str }` and returning `SpeakerResolution`. Register this router in `app/main.py`.
+    - [ ] **13.2.e** Write `tests/test_speaker_resolver.py` with mocked LLMGateway responses covering: (i) solo speaker → `confidence: "high"`, (ii) debate video → `confidence: "medium"` + multiple `all_speakers`, (iii) unidentifiable title → `name: "Unknown Speaker"`.
+  - **Verification:** `pytest tests/test_speaker_resolver.py` passes. `curl -X POST /api/resolve-speaker -d '{"title":"Joe Biden State of the Union 2024","description":"..."}' ` returns `{"name":"Joe Biden","confidence":"high",...}`.
+
+- [ ] **[Task 13.3] Video Metadata Scraper & Speaker Threading (Extension)**
+  - **Focus:** Extension / content.js + background.js
+  - **Branch:** `feature/13.3-video-metadata-speaker`
+  - **Description:** On page load and `yt-navigate-finish`, scrape the video title and description from the YouTube DOM and send them to `background.js` as a `VIDEO_METADATA` message. `background.js` calls the new `/api/resolve-speaker` REST endpoint, stores the result as `currentSpeaker`, and attaches the speaker to every outgoing WebSocket payload.
+  - **Sub-tasks:**
+    - [ ] **13.3.a** In `content.js`, add `scrapeVideoMetadata()`: read `document.title` and the first 500 chars of `#description yt-attributed-string` (or `ytd-expander`). Send `{ action: "VIDEO_METADATA", title, description, videoId }` to `background.js`. Call on page load and `yt-navigate-finish` (after the existing `resetBuffer()` call), with a 2-second delay for DOM hydration.
+    - [ ] **13.3.b** In `background.js`, add state: `let currentSpeaker = "Unknown Speaker"; let speakerConfidence = "low"; let allSpeakers = [];`. On `NAVIGATE_FINISH`, reset all three to defaults.
+    - [ ] **13.3.c** Add `VIDEO_METADATA` handler in `background.js`'s `chrome.runtime.onMessage.addListener`. Use `fetch()` to POST `{ title, description }` to `http://localhost:8000/api/resolve-speaker`. On success, set `currentSpeaker`, `speakerConfidence`, and `allSpeakers` from the response. Persist `currentSpeaker` to `chrome.storage.local`. Log: `[bg] 🧠 LLM resolved speaker: "${name}" (confidence: "${confidence}")`.
+    - [ ] **13.3.d** Modify `handleSegmentedSentence(text, speakerOverride = null)` in `background.js` to accept an optional override. Use `speakerOverride ?? currentSpeaker` as the final speaker. Include `speaker` and `speakerConfidence` in the WebSocket JSON payload: `{ sentence: cleanText, speaker, speakerConfidence }`.
+    - [ ] **13.3.e** In `background.js`, propagate `speaker` from the `CAPTION_CHUNK` message (if present) into the `streamBuffer.addChunk()` call and store the most-recent chunk's speaker so it is passed to `handleSegmentedSentence()` when the buffer flushes.
+  - **Verification:** Open any YouTube video of a political speech. Within 3 seconds, `background.js` console shows `[bg] 🧠 LLM resolved speaker: "..."`. Confirm `speaker` field is present in the WebSocket payload observed in the backend logs.
+
+- [ ] **[Task 13.4] Backend Pipeline Speaker Wiring**
+  - **Focus:** Backend / API + Services + Schemas
+  - **Branch:** `feature/13.4-backend-speaker-wiring`
+  - **Description:** Thread the `speaker` field from the WebSocket payload through the entire backend pipeline: WebSocket handler → orchestrator → `Claim` schema. Remove the hardcoded `"Governor Alexis Vance"`.
+  - **Sub-tasks:**
+    - [ ] **13.4.a** Add `speaker: Optional[str] = None` and `speaker_confidence: Optional[Literal["high", "medium", "low"]] = None` to the `Claim` model in `app/schemas.py`. Update `metadata.index_fields` to include `"speaker"`. Run `pytest tests/test_schemas.py`.
+    - [ ] **13.4.b** In `app/api/websocket.py`, read `speaker = data.get("speaker", "Unknown Speaker")` and `speaker_confidence = data.get("speakerConfidence", "low")` from the incoming JSON. Only trust speaker as `politician_name` when `speaker_confidence` is `"medium"` or `"high"`; else use `"Unknown Speaker"`.
+    - [ ] **13.4.c** Remove the hardcoded `politician_name="Governor Alexis Vance"` on line 67 of `websocket.py`. Replace with the dynamic `speaker` value from the payload.
+    - [ ] **13.4.d** Update `process_incoming_sentence()` in `app/services/orchestrator.py` to accept and forward `politician_name: str = "Unknown Speaker"` (it already does; verify no implicit assumptions about the name value).
+    - [ ] **13.4.e** Include `speaker` and `speakerConfidence` in the WebSocket response payload sent back to the extension so the side panel can display attribution on verdict cards.
+  - **Verification:** `pytest` passes with no regressions. Backend logs show the actual resolved speaker name (not `"Governor Alexis Vance"`) for every processed sentence. Side panel verdict cards display the speaker name.
+
+---
+
+#### Layer 3 — Video Frame OCR for Lower-Third Graphics (Broadcast News, Optional)
+
+- [ ] **[Task 13.5] Frame OCR Lower-Third Scraper (Extension + Backend)**
+  - **Focus:** Extension / content.js + Backend / OCR service
+  - **Branch:** `feature/13.5-frame-ocr-lower-third`
+  - **Description:** For broadcast news streams where lower-third chyrons identify the speaker, periodically capture the video player frame from the extension, crop the bottom 20%, send it to a new vision-LLM backend endpoint, and use the returned speaker to override `currentSpeaker` in real-time.
+  - **Sub-tasks:**
+    - [ ] **13.5.a** In `background.js`, add `startLowerThirdPoller(videoId)` that fires `chrome.tabs.captureVisibleTab()` every 3 seconds. Crop the bottom 20% of the player element's bounding box from the captured screenshot (canvas crop). Rate-limit: skip if a request is already in-flight.
+    - [ ] **13.5.b** POST the cropped image (base64 PNG) to `POST /api/ocr-lower-third` with `{ image: base64str, videoId }`. On success, if `result.speaker` is non-null and differs from `currentSpeaker`, update `currentSpeaker` and log: `[bg] 📺 Lower-third updated speaker → "${result.speaker}"`.
+    - [ ] **13.5.c** Create `app/api/ocr.py` with `POST /api/ocr-lower-third`. Accept `{ image: str, videoId: str }`. Decode base64, send to vision LLM (Gemini Vision or GPT-4o) with prompt: "Read any lower-third text in this image. Return the speaker's name on the first line if present, or null." Regex-post-process to normalize `FIRSTNAME LASTNAME`. Return `{ speaker: str | null, confidence: str }`.
+    - [ ] **13.5.d** Add deduplication in `ocr.py`: if the same speaker was returned for the last 3 consecutive frames, skip sending updates to avoid redundant state churn in the extension.
+    - [ ] **13.5.e** Add `OCR_ENABLED: bool` env flag (default `false`) so this feature is opt-in. Register `app/api/ocr.py` router in `app/main.py` only when `OCR_ENABLED=true`.
+  - **Verification:** With `OCR_ENABLED=true`, open a CNN YouTube live stream with visible lower-third name graphics. Confirm `currentSpeaker` updates in `background.js` console within 3–6 seconds of a new speaker appearing. Confirm the updated speaker name propagates to the WebSocket payload and appears on the next verdict card.
+

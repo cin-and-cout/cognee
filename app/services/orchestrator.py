@@ -33,7 +33,9 @@ async def process_incoming_sentence(
 
     cached_report = get_cached_verdict(text)
     if cached_report:
+        logger.info("⚡ [orchestrator] Cache HIT for sentence")
         return cached_report
+    logger.info("⏳ [orchestrator] Cache MISS, starting pipeline")
 
     # 1. Extract claim
     new_claim = await extract_claim_from_text(
@@ -43,7 +45,9 @@ async def process_incoming_sentence(
         politician_party,
     )
     if not new_claim:
+        logger.info("🤷 [orchestrator] No claim extracted from sentence")
         return None
+    logger.info("🎯 [orchestrator] Claim extracted: topic='%s', is_numeric=%s", new_claim.topic.name, new_claim.is_numeric)
 
     # 2. Retrieve historical claims for the topic
     historical_claims = await get_historical_claims(new_claim.topic.name)
@@ -54,6 +58,11 @@ async def process_incoming_sentence(
         if claim.claim_date < new_claim.claim_date:
             if not latest_historical or claim.claim_date > latest_historical.claim_date:
                 latest_historical = claim
+
+    if latest_historical:
+        logger.info("📚 [orchestrator] Found %d historical claims, latest prior match on %s", len(historical_claims), latest_historical.claim_date)
+    else:
+        logger.info("📚 [orchestrator] Found %d historical claims, but none prior to %s", len(historical_claims), new_claim.claim_date)
 
     # 3. Perform comparison if a prior record exists
     if latest_historical:
