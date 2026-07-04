@@ -19,6 +19,7 @@ async def process_incoming_sentence(
     politician_name: str,
     claim_date: str,
     politician_party: Optional[str] = None,
+    speaker_confidence: str = "low",
 ) -> Optional[Dict[str, Any]]:
     """
     Orchestrates the entire claim consistency pipeline for a single speech sentence:
@@ -44,6 +45,9 @@ async def process_incoming_sentence(
         claim_date,
         politician_party,
     )
+    if new_claim:
+        new_claim.speaker_confidence = speaker_confidence
+
     if not new_claim:
         logger.info("🤷 [orchestrator] No claim extracted from sentence")
         return None

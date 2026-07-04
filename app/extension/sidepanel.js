@@ -213,8 +213,16 @@ document.addEventListener("DOMContentLoaded", () => {
     sentence.className = "log-sentence";
     sentence.textContent = `"${log.text}"`;
 
+    // --- Speaker Badge ---
+    const speaker = log.speaker || "Unknown Speaker";
+    const confidence = (log.speakerConfidence || "low").toLowerCase();
+    const speakerBadge = document.createElement("span");
+    speakerBadge.className = `speaker-badge speaker-${confidence}`;
+    speakerBadge.textContent = `🗣️ ${speaker}`;
+
     wrapper.appendChild(header);
     wrapper.appendChild(sentence);
+    wrapper.appendChild(speakerBadge);
 
     // --- Per-report blocks ---
     if (Array.isArray(log.report) && log.report.length > 0) {

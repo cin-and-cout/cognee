@@ -2,6 +2,7 @@ import app.env_init  # noqa: F401
 from fastapi import FastAPI
 
 from app.api.websocket import router as ws_router
+from app.api.speaker import router as speaker_router
 
 app = FastAPI(
     title="Claim Consistency Tracker API",
@@ -11,6 +12,7 @@ app = FastAPI(
 
 # Register API routes
 app.include_router(ws_router)
+app.include_router(speaker_router)
 
 
 @app.get("/")

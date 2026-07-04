@@ -2,6 +2,13 @@ let socket = null;
 let reconnectTimer = null;
 
 // ============================================================================
+// Speaker Attribution State (Milestone 13)
+// ============================================================================
+let currentSpeaker = "Unknown Speaker";
+let speakerConfidence = "low";
+let allSpeakers = [];
+
+// ============================================================================
 // Milestone 11.2.b — transcriptMode flag
 // ============================================================================
 
@@ -108,9 +115,12 @@ class StreamBuffer {
    * @param {string} text          — The delta word chunk from content.js.
    * @param {string} bufferSnapshot — The last 100 words of globalWordBuffer
    *                                  (joined as a string) from content.js.
+   * @param {string|null} speaker   — The speaker name (from chyron or fallback).
    */
-  addChunk(text, bufferSnapshot = "") {
+  addChunk(text, bufferSnapshot = "", speaker = null) {
     if (!text || !text.trim()) return;
+
+    this.lastSpeaker = speaker;
 
     const cleaned = text.trim();
 
@@ -421,7 +431,7 @@ class StreamBuffer {
 
     this._lastFlushMethod = flushMethod;
     console.log(`[bg] 🔊 StreamBuffer [${flushMethod}] → sentence ready: "${dedupedSentence}"`);
-    this.onSentenceReady(dedupedSentence);
+    this.onSentenceReady(dedupedSentence, this.lastSpeaker);
   }
 
   /**
@@ -565,8 +575,8 @@ function splitIntoSentences(text) {
 // Instantiate the StreamBuffer
 // ============================================================================
 
-const streamBuffer = new StreamBuffer((sentence) => {
-  handleSegmentedSentence(sentence);
+const streamBuffer = new StreamBuffer((sentence, speaker) => {
+  handleSegmentedSentence(sentence, speaker);
 });
 
 // ============================================================================
@@ -597,6 +607,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   } else if (message.action === "FULL_TRANSCRIPT") {
     console.log(`[bg] 📄 FULL_TRANSCRIPT received: ${(message.segments || []).length} segments — switching to transcript mode.`);
+    if (message.primarySpeaker && currentSpeaker === "Unknown Speaker") {
+      currentSpeaker = message.primarySpeaker;
+      speakerConfidence = "high";
+      console.log(`[bg] 🏷️ Speaker from transcript labels: "${currentSpeaker}"`);
+    }
     _setTranscriptMode(true);
     streamBuffer.reset(); // ensure live buffer is clean
     processFullTranscript(message.segments || []);
@@ -608,8 +623,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "NAVIGATE_FINISH") {
     // content.js fires this when yt-navigate-finish fires so background.js
     // can reset transcriptMode in sync with the new video.
-    console.log("[bg] 🔄 NAVIGATE_FINISH — resetting transcriptMode.");
+    console.log("[bg] 🔄 NAVIGATE_FINISH — resetting transcriptMode and speaker state.");
     _setTranscriptMode(false);
+    currentSpeaker = "Unknown Speaker";
+    speakerConfidence = "low";
+    allSpeakers = [];
     streamBuffer.reset();
 
   // ---------------------------------------------------------------------------
@@ -620,11 +638,54 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // keep channel open for async response
 
   // ---------------------------------------------------------------------------
+  // Milestone 13.3 — Video Metadata Path
+  // ---------------------------------------------------------------------------
+  } else if (message.action === "VIDEO_METADATA") {
+    console.log(`[bg] 🎬 VIDEO_METADATA received: "${message.title}"`);
+    fetch("http://localhost:8000/api/resolve-speaker", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: message.title,
+        description: message.description
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.name) {
+        currentSpeaker = data.name;
+        speakerConfidence = data.confidence || "low";
+        allSpeakers = data.all_speakers || [];
+        chrome.storage.local.set({ currentSpeaker });
+        console.log(`[bg] 🧠 LLM resolved speaker: "${currentSpeaker}" (confidence: "${speakerConfidence}")`);
+
+        // Update existing logs that had "Unknown Speaker"
+        chrome.storage.local.get("logs", (store) => {
+          const logs = store.logs || [];
+          let updated = false;
+          logs.forEach(log => {
+            if (log.speaker === "Unknown Speaker") {
+              log.speaker = currentSpeaker;
+              log.speakerConfidence = speakerConfidence;
+              updated = true;
+            }
+          });
+          if (updated) {
+            chrome.storage.local.set({ logs }, () => {
+              chrome.runtime.sendMessage({ action: "NEW_LOG" });
+            });
+          }
+        });
+      }
+    })
+    .catch(err => console.error("[bg] Error calling /api/resolve-speaker:", err));
+
+  // ---------------------------------------------------------------------------
   // Live caption path (Milestone 10.2.d)
   // ---------------------------------------------------------------------------
   } else if (message.action === "CAPTION_CHUNK") {
     console.log(`[bg] 🔊 CAPTION_CHUNK received (caption mode): "${message.text}"`);
-    streamBuffer.addChunk(message.text, message.bufferSnapshot || "");
+    streamBuffer.addChunk(message.text, message.bufferSnapshot || "", message.speaker || null);
 
   } else if (message.action === "TRANSCRIPT_CAPTURED") {
     // Legacy: still accept pre-formed sentences (e.g., from other sources)
@@ -661,7 +722,7 @@ function connectWebSocket(url) {
           // handleSegmentedSentence(). If that async write hasn't landed
           // yet, retry up to 5 times (250ms total) rather than creating a
           // duplicate entry — this is the root cause of double feed items.
-          _attachReportToLog(data.text, data.report, 0);
+          _attachReportToLog(data.text, data, 0);
         }
       } catch (err) {
         console.error("Error parsing WebSocket message:", err);
@@ -710,10 +771,10 @@ function disconnectWebSocket() {
  * by the `else { logs.push(...) }` branch in onmessage.
  *
  * @param {string} text      — The sentence text to match.
- * @param {*}      report    — The verdict report from the backend.
+ * @param {*}      data      — The parsed JSON from the backend.
  * @param {number} attempt   — Current retry count (start at 0).
  */
-function _attachReportToLog(text, report, attempt) {
+function _attachReportToLog(text, data, attempt) {
   const MAX_RETRIES = 5;
   const RETRY_MS = 50;
 
@@ -723,19 +784,27 @@ function _attachReportToLog(text, report, attempt) {
 
     if (existingLog) {
       // Found — attach the report and persist
-      console.log(`[bg] 🔗 _attachReportToLog: Attached report to entry (attempt ${attempt + 1}). Topic: ${report?.new_claim?.topic}`);
-      existingLog.report = report;
+      console.log(`[bg] 🔗 _attachReportToLog: Attached report to entry (attempt ${attempt + 1}). Topic: ${data.report?.new_claim?.topic}`);
+      existingLog.report = data.report;
+      if (data.speaker) existingLog.speaker = data.speaker;
+      if (data.speakerConfidence) existingLog.speakerConfidence = data.speakerConfidence;
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
       });
     } else if (attempt < MAX_RETRIES) {
       // Entry not yet written by handleSegmentedSentence — retry shortly
       console.log(`_attachReportToLog: entry not found, retry ${attempt + 1}/${MAX_RETRIES}`);
-      setTimeout(() => _attachReportToLog(text, report, attempt + 1), RETRY_MS);
+      setTimeout(() => _attachReportToLog(text, data, attempt + 1), RETRY_MS);
     } else {
       // Gave up retrying — create the entry so the verdict is not lost
       console.warn("_attachReportToLog: gave up waiting for log entry, creating fallback.");
-      logs.push({ timestamp: Date.now(), text, report });
+      logs.push({ 
+        timestamp: Date.now(), 
+        text, 
+        report: data.report, 
+        speaker: data.speaker, 
+        speakerConfidence: data.speakerConfidence 
+      });
       if (logs.length > 50) logs.shift();
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
@@ -782,15 +851,20 @@ function processFullTranscript(segments) {
 /**
  * Handle a fully segmented sentence — send it to the backend and log it.
  */
-function handleSegmentedSentence(text) {
+function handleSegmentedSentence(text, speakerOverride = null) {
   if (!text || !text.trim()) return;
 
   const cleanText = text.trim();
+  const finalSpeaker = speakerOverride ?? currentSpeaker;
 
   if (socket && socket.readyState === WebSocket.OPEN) {
-    const payload = JSON.stringify({ sentence: cleanText });
+    const payload = JSON.stringify({ 
+      sentence: cleanText,
+      speaker: finalSpeaker,
+      speakerConfidence: speakerConfidence
+    });
     socket.send(payload);
-    console.log(`[bg] ✉️  Sentence sent to backend: "${cleanText}"`);
+    console.log(`[bg] ✉️  Sentence sent to backend: "${cleanText}" (Speaker: ${finalSpeaker})`);
   } else {
     console.log(`[bg] ⚠️  Cannot send — WebSocket not open. Dropping sentence: "${cleanText}"`);
   }
@@ -802,6 +876,8 @@ function handleSegmentedSentence(text) {
         timestamp: Date.now(),
         text: cleanText,
         report: null,
+        speaker: finalSpeaker,
+        speakerConfidence: speakerConfidence
       });
       if (logs.length > 50) {
         logs.shift();

@@ -1,9 +1,12 @@
+import logging
 from typing import Optional
 
 from cognee.infrastructure.llm.LLMGateway import LLMGateway
 from pydantic import BaseModel, Field
 
 from app.schemas import Claim, Politician, Topic
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractedClaimModel(BaseModel):
@@ -84,14 +87,24 @@ async def extract_claim_from_text(
     Extracts a structured Claim object from a given raw text sentence if a
     checkable claim is present. Returns None if no checkable claim is found.
     """
+    logger.info(f"Extracting claim from text for politician: '{politician_name}'")
+    logger.debug(f"Text snippet: {text[:100]}...")
+    
     try:
+        logger.info("Calling LLM Gateway for claim extraction...")
+        logger.debug(f"System Prompt:\n{SYSTEM_PROMPT.strip()}\nText Input:\n{text}")
+        
         extracted: ExtractedClaimModel = await LLMGateway.acreate_structured_output(
             text_input=text,
             system_prompt=SYSTEM_PROMPT.strip(),
             response_model=ExtractedClaimModel,
         )
 
+        logger.info(f"Received claim extraction output. Has claim: {extracted.has_claim}")
+        logger.debug(f"Raw extracted claim data: {extracted.model_dump()}")
+
         if not extracted.has_claim or not extracted.topic or not extracted.statement:
+            logger.info("No actionable claim found in the text.")
             return None
 
         # Instantiate the custom Datapoint models
@@ -122,5 +135,5 @@ async def extract_claim_from_text(
         return claim_node
 
     except Exception as e:
-        print(f"Error extracting claim from text: {e}")
+        logger.exception(f"Error extracting claim from text: {e}")
         return None

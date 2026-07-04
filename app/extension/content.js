@@ -1,4 +1,6 @@
-console.log("[content.js] Live Claim Consistency Tracker content script initialized.");
+console.log(
+  "[content.js] Live Claim Consistency Tracker content script initialized.",
+);
 
 /**
  * Word-level YouTube caption stream collector — Milestone 10.1 / 11.1
@@ -33,9 +35,9 @@ console.log("[content.js] Live Claim Consistency Tracker content script initiali
  */
 let globalWordBuffer = [];
 
-let previousWords    = [];   // flat word array from last caption observation
-let debounceTimer    = null; // MutationObserver debounce timer
-let captionObserver  = null; // MutationObserver instance (kept for reset)
+let previousWords = []; // flat word array from last caption observation
+let debounceTimer = null; // MutationObserver debounce timer
+let captionObserver = null; // MutationObserver instance (kept for reset)
 
 /**
  * true once a human-authored transcript has been found and scraped.
@@ -107,8 +109,8 @@ function processCaptions() {
     .trim();
 
   const currentWords = fullText ? fullText.split(" ") : [];
-  const newWords     = computeNewWords(previousWords, currentWords);
-  previousWords      = [...currentWords];
+  const newWords = computeNewWords(previousWords, currentWords);
+  previousWords = [...currentWords];
 
   if (newWords.length === 0) return;
 
@@ -140,15 +142,49 @@ function processCaptions() {
 function resetBuffer() {
   console.log("[content.js] 🔄 Navigation detected — resetting session state.");
   globalWordBuffer = [];
-  previousWords    = [];
-  transcriptMode   = false;
+  previousWords = [];
+  transcriptMode = false;
   // Inform background.js so it can reset transcriptMode flag
   chrome.runtime.sendMessage({ action: "NAVIGATE_FINISH" });
   // Re-arm the transcript probe for the new video (with delay for DOM hydration)
   setTimeout(() => probeForTranscript(1), 2000);
+
+  // Scrape video metadata for speaker attribution
+  setTimeout(() => scrapeVideoMetadata(), 2000);
 }
 
 document.addEventListener("yt-navigate-finish", resetBuffer);
+
+// =============================================================================
+// Milestone 13.3 — Video Metadata Scraper (LLM Speaker Resolution)
+// =============================================================================
+
+function scrapeVideoMetadata() {
+  const videoId = new URLSearchParams(window.location.search).get("v") || "";
+  if (!videoId) return;
+
+  const titleEl =
+    document.querySelector("h1.ytd-watch-metadata yt-formatted-string") ||
+    document.querySelector("title");
+  const title = titleEl ? titleEl.textContent.trim() : "";
+
+  // The description might be in #description yt-attributed-string or similar
+  const descEl =
+    document.querySelector("#description yt-attributed-string") ||
+    document.querySelector("#description ytd-expander");
+  const description = descEl ? descEl.textContent.trim().substring(0, 500) : "";
+
+  console.log(`[content.js] 🎬 Scraped video metadata. Title: "${title}"`);
+  chrome.runtime.sendMessage({
+    action: "VIDEO_METADATA",
+    title,
+    description,
+    videoId,
+  });
+}
+
+// Initial scrape on page load
+setTimeout(() => scrapeVideoMetadata(), 2000);
 
 // =============================================================================
 // Milestone 11.1 — Transcript Detection & Scraping
@@ -215,30 +251,51 @@ function waitForTranscriptSegments(container, timeoutMs = 3000) {
 }
 
 function scrapeTranscriptSegments() {
-  const segmentEls = document.querySelectorAll("ytd-transcript-segment-renderer");
-  const segments   = [];
-  let emptyCount   = 0;
+  const segmentEls = document.querySelectorAll(
+    "ytd-transcript-segment-renderer",
+  );
+  const segments = [];
+  let emptyCount = 0;
+
+  // Regex to match speaker labels like "[Speaker Name]:" or "Speaker Name:"
+  const speakerRegex =
+    /^\[?([A-Z][a-z]+(?: [A-Z][a-z]+)+|[A-Z]+(?: [A-Z]+)+)\]?:\s*/;
 
   segmentEls.forEach((el) => {
-    const textEl      = el.querySelector(".segment-text");
+    const textEl = el.querySelector(".segment-text");
     const timestampEl = el.querySelector(".segment-timestamp");
 
-    const text    = textEl      ? textEl.textContent.trim()      : "";
+    let text = textEl ? textEl.textContent.trim() : "";
     const startMs = timestampEl ? parseTimestampMs(timestampEl.textContent) : 0;
 
+    let speaker = null;
+
     if (text) {
-      segments.push({ text, startMs });
+      const match = text.match(speakerRegex);
+      if (match) {
+        speaker = match[1];
+        text = text.replace(speakerRegex, "").trim();
+      }
+      segments.push({ text, startMs, speaker });
     } else {
       emptyCount++;
     }
   });
 
-  console.log(`[content.js] 📊 Scraped ${segmentEls.length} segments. ${emptyCount} empty texts discarded.`);
+  console.log(
+    `[content.js] 📊 Scraped ${segmentEls.length} segments. ${emptyCount} empty texts discarded.`,
+  );
   if (segments.length > 0) {
     const totalChars = segments.reduce((sum, s) => sum + s.text.length, 0);
     console.log(`[content.js] 📊 Total scraped characters: ${totalChars}`);
-    console.log(`[content.js] 📊 First 3:`, segments.slice(0, 3).map(s => s.text));
-    console.log(`[content.js] 📊 Last 3:`, segments.slice(-3).map(s => s.text));
+    console.log(
+      `[content.js] 📊 First 3:`,
+      segments.slice(0, 3).map((s) => s.text),
+    );
+    console.log(
+      `[content.js] 📊 Last 3:`,
+      segments.slice(-3).map((s) => s.text),
+    );
   }
 
   return segments;
@@ -260,12 +317,16 @@ async function clickTranscriptAndScrape(transcriptBtn) {
   const appeared = await waitForTranscriptSegments(document.body, 3000);
 
   if (!appeared) {
-    console.warn("[content.js] ⚠️  Transcript segments did not appear within 3 s.");
+    console.warn(
+      "[content.js] ⚠️  Transcript segments did not appear within 3 s.",
+    );
     return [];
   }
 
   const segments = scrapeTranscriptSegments();
-  console.log(`[content.js] 📄 Scraped ${segments.length} transcript segments.`);
+  console.log(
+    `[content.js] 📄 Scraped ${segments.length} transcript segments.`,
+  );
   return segments;
 }
 
@@ -286,13 +347,15 @@ async function findTranscriptButton() {
   // YouTube places it in ytd-menu-renderer on the watch page
   const overflowBtn = document.querySelector(
     "ytd-menu-renderer button.yt-icon-button, " +
-    "#top-level-buttons-computed ytd-button-renderer:last-child button, " +
-    "[aria-label='More actions']"
+      "#top-level-buttons-computed ytd-button-renderer:last-child button, " +
+      "[aria-label='More actions']",
   );
 
   if (!overflowBtn) return null;
 
-  console.log("[content.js] 🔍 Opening overflow menu to look for 'Show transcript'…");
+  console.log(
+    "[content.js] 🔍 Opening overflow menu to look for 'Show transcript'…",
+  );
   overflowBtn.click();
 
   // Wait for the menu to render
@@ -300,10 +363,13 @@ async function findTranscriptButton() {
 
   // Re-probe — YouTube's popup menu items use ytd-menu-service-item-renderer
   const menuItems = document.querySelectorAll(
-    "ytd-menu-service-item-renderer, tp-yt-paper-item"
+    "ytd-menu-service-item-renderer, tp-yt-paper-item",
   );
   for (const item of menuItems) {
-    if (item.textContent && item.textContent.trim().toLowerCase().includes("show transcript")) {
+    if (
+      item.textContent &&
+      item.textContent.trim().toLowerCase().includes("show transcript")
+    ) {
       return item;
     }
   }
@@ -324,7 +390,12 @@ async function findTranscriptButton() {
  * @param {number} maxAttempts — total allowed attempts (default 3)
  */
 async function probeForTranscript(attempt = 1, maxAttempts = 3) {
-  console.log(`[content.js] 🔍 Probing for transcript button (attempt ${attempt}/${maxAttempts})…`);
+  console.log("[content.js] 🔍 Transcript extraction is currently disabled.");
+  return;
+
+  console.log(
+    `[content.js] 🔍 Probing for transcript button (attempt ${attempt}/${maxAttempts})…`,
+  );
 
   const btn = await findTranscriptButton();
 
@@ -339,35 +410,51 @@ async function probeForTranscript(attempt = 1, maxAttempts = 3) {
     const segments = await clickTranscriptAndScrape(btn);
 
     if (segments.length === 0) {
-      console.warn("[content.js] ⚠️  Scrape returned 0 segments — falling back to captions.");
+      console.warn(
+        "[content.js] ⚠️  Scrape returned 0 segments — falling back to captions.",
+      );
       return; // caption observer stays connected
     }
 
+    // 13.1.c — derive primarySpeaker
+    let primarySpeaker = null;
+    for (const seg of segments) {
+      if (seg.speaker) {
+        primarySpeaker = seg.speaker;
+        break;
+      }
+    }
+
     // 11.1.d — send full transcript to background
-    console.log(`[content.js] 📄 FULL_TRANSCRIPT sent: ${segments.length} segments.`);
+    console.log(
+      `[content.js] 📄 FULL_TRANSCRIPT sent: ${segments.length} segments.`,
+    );
     chrome.runtime.sendMessage({
       action: "FULL_TRANSCRIPT",
       segments,
       videoId,
+      primarySpeaker,
     });
 
     // 11.1.e — disable caption observer to prevent parallel processing
     transcriptMode = true;
     if (captionObserver) {
       captionObserver.disconnect();
-      console.log("[content.js] 🔇 Caption observer disconnected (transcript mode active).");
+      console.log(
+        "[content.js] 🔇 Caption observer disconnected (transcript mode active).",
+      );
     }
     chrome.runtime.sendMessage({ action: "DISABLE_CAPTION_SCRAPER" });
-
   } else if (attempt < maxAttempts) {
     // Retry after 1 second (handles late DOM rendering)
-    console.log(`[content.js] ⏳ Transcript button not found yet — retrying in 1 s…`);
+    console.log(
+      `[content.js] ⏳ Transcript button not found yet — retrying in 1 s…`,
+    );
     setTimeout(() => probeForTranscript(attempt + 1, maxAttempts), 1000);
-
   } else {
     // All attempts exhausted — use live captions
     console.log(
-      `[content.js] ❌ No transcript button found after ${maxAttempts} attempts — using live captions.`
+      `[content.js] ❌ No transcript button found after ${maxAttempts} attempts — using live captions.`,
     );
   }
 }
@@ -392,11 +479,14 @@ function startObserving() {
   const targetNode =
     document.querySelector(".ytp-caption-window-container") || document.body;
   observer.observe(targetNode, {
-    childList:     true,
-    subtree:       true,
+    childList: true,
+    subtree: true,
     characterData: true,
   });
-  console.log("[content.js] 👁️  Observing caption container:", targetNode.nodeName);
+  console.log(
+    "[content.js] 👁️  Observing caption container:",
+    targetNode.nodeName,
+  );
 
   // 11.1.a — probe for transcript on page load (with slight delay so the
   // watch page buttons have time to hydrate)

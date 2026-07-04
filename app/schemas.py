@@ -44,6 +44,7 @@ class Claim(DataPoint):
     topic: SkipValidation[Any]
     claim_date: str  # Format: YYYY-MM-DD (validated on input)
     source_link: Optional[str] = None
+    speaker_confidence: str = "low"
 
     # Quantitative fields for numeric drift comparison
     is_numeric: bool = False

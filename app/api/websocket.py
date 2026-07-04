@@ -39,6 +39,8 @@ async def websocket_live_speech(websocket: WebSocket):
             # Wait for incoming text or json from client (e.g., {"sentence": "..."})
             data = await websocket.receive_json()
             sentence = data.get("sentence", "").strip()
+            speaker = data.get("speaker", "Governor Alexis Vance")
+            speaker_confidence = data.get("speakerConfidence", "low")
             if not sentence:
                 continue
 
@@ -64,9 +66,10 @@ async def websocket_live_speech(websocket: WebSocket):
             try:
                 report = await process_incoming_sentence(
                     text=sentence,
-                    politician_name="Governor Alexis Vance",
+                    politician_name=speaker,
                     claim_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                    politician_party="Progressive Coalition",
+                    politician_party="Progressive Coalition", # We can look this up in the future
+                    speaker_confidence=speaker_confidence,
                 )
                 logger.info(
                     "✅ [ws] Pipeline complete — verdict: %s, topic: %s",
@@ -79,6 +82,8 @@ async def websocket_live_speech(websocket: WebSocket):
 
             payload = {
                 "text": sentence,
+                "speaker": speaker,
+                "speakerConfidence": speaker_confidence,
                 "timestamp": (datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")),
                 "report": report,
             }
