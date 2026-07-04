@@ -65,3 +65,4 @@ neo4j_data/
 pyrightconfig.json
 .env
 .cognee_system/
+.ruff_cache/
