@@ -2,7 +2,7 @@ let socket = null;
 let reconnectTimer = null;
 
 // ============================================================================
-// StreamBuffer — Sentence segmenter for raw caption chunks
+// StreamBuffer — Sentence segmenter for raw caption chunks (Milestone 10.2)
 // ============================================================================
 
 /**
@@ -10,13 +10,25 @@ let reconnectTimer = null;
  * complete sentences using three strategies:
  *
  *   A) Rule-based punctuation splitting (fast path)
- *   B) Adaptive timeout based on rolling words-per-second
+ *   B) Pause detection — adaptive timeout cross-referenced against the
+ *      bufferSnapshot from content.js to confirm a real speech pause
  *   C) Max-buffer safety valve (40 words)
+ *
+ * New in Milestone 10.2:
+ *   - `flushTimer` renamed to `pauseDetectionTimer` for semantic clarity.
+ *   - `lastSnapshot` — stores the bufferSnapshot from the most recent chunk.
+ *     When pauseDetectionTimer fires, the snapshot's word count is compared
+ *     to the internal buffer word count. If they match, the pause is confirmed
+ *     and the buffer is flushed immediately; otherwise one heartbeat deferral
+ *     is allowed before a force-flush.
+ *   - `lastChunkArrival` — timestamp of the most recent chunk. If the gap
+ *     since lastChunkArrival exceeds 1.5× the computed pauseDetectionTimeout,
+ *     the buffer is force-flushed with no deferral (hard pause).
+ *   - `stats()` method for live debugging from the service-worker console.
  *
  * Deduplication uses a Global Word Ledger — an append-only list of every
  * word ever emitted (capped at 200). Before emitting a sentence, its prefix
  * is aligned against the ledger's suffix to strip already-emitted words.
- * This eliminates all repetition without heuristic thresholds.
  *
  * A 5-second heartbeat timer ensures the buffer is drained even when no
  * new chunks arrive (e.g., video paused or segment ended).
@@ -27,14 +39,23 @@ class StreamBuffer {
 
     // Buffer state
     this.buffer = "";
-    this.flushTimer = null;
+
+    // --- Milestone 10.2.a: renamed from flushTimer ---
+    this.pauseDetectionTimer = null;
+
+    // --- Milestone 10.2.b: bufferSnapshot cross-reference ---
+    this.lastSnapshot = ""; // snapshot from the most recent CAPTION_CHUNK
+
+    // --- Milestone 10.2.c: hard-pause detection ---
+    this.lastChunkArrival = 0;            // timestamp (ms) of most recent chunk
+    this._pendingDeferral = false;        // true when we are in the one-deferral window
 
     // Adaptive timeout state — tracks speaking rate
     this.wordTimestamps = [];        // array of { count, time } for rolling WPS
     this.WPS_WINDOW_MS = 10000;      // 10-second rolling window
     this.AVG_WORDS_PER_SENTENCE = 12;
 
-    // Timeout bounds (ms)
+    // Timeout bounds (ms) — same clamped range [800ms–3000ms]
     this.MIN_TIMEOUT = 800;
     this.MAX_TIMEOUT = 3000;
 
@@ -49,6 +70,10 @@ class StreamBuffer {
     this.heartbeatTimer = null;
     this.HEARTBEAT_MS = 5000;
 
+    // For stats()
+    this._lastFlushMethod = "none";
+    this._emittedTotal = 0;
+
     // Common abbreviations that should NOT trigger a sentence split
     this.ABBREVIATIONS = new Set([
       "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "ave",
@@ -60,11 +85,22 @@ class StreamBuffer {
 
   /**
    * Feed a new chunk of raw text into the buffer.
+   *
+   * @param {string} text          — The delta word chunk from content.js.
+   * @param {string} bufferSnapshot — The last 100 words of globalWordBuffer
+   *                                  (joined as a string) from content.js.
    */
-  addChunk(text) {
+  addChunk(text, bufferSnapshot = "") {
     if (!text || !text.trim()) return;
 
     const cleaned = text.trim();
+
+    // 10.2.b — store the latest snapshot for pause confirmation
+    this.lastSnapshot = bufferSnapshot || "";
+
+    // 10.2.c — record arrival timestamp for hard-pause detection
+    this.lastChunkArrival = Date.now();
+    this._pendingDeferral = false; // cancel any active deferral on new data
 
     // Append to buffer
     if (this.buffer.length > 0) {
@@ -84,10 +120,10 @@ class StreamBuffer {
     // Strategy C: Check safety valve
     this._checkSafetyValve();
 
-    // Strategy B: Reset adaptive timeout
-    this._resetAdaptiveTimeout();
+    // Strategy B: Reset pause detection timer
+    this._resetPauseDetectionTimer();
 
-    // Reset heartbeat — we just received data, so push back the drain timer
+    // Reset heartbeat — we just received data
     this._resetHeartbeat();
   }
 
@@ -96,68 +132,100 @@ class StreamBuffer {
    *
    * Looks for sentence-ending punctuation (. ! ?) in the buffer.
    * Only splits when:
-   *   - The punctuation is followed by a space + uppercase letter, OR is at the end of the buffer
+   *   - The punctuation is followed by a space + uppercase letter, OR is at end of buffer
    *   - At least 4 words precede the punctuation (avoids abbreviation false positives)
    *   - The word before the punctuation is NOT a known abbreviation
    */
   _tryRuleBasedSplit() {
-    // Pattern: sentence-ending punctuation followed by space+uppercase or end-of-string
-    // We use a loop to extract multiple sentences if the buffer contains several.
     let didFlush = true;
 
     while (didFlush) {
       didFlush = false;
 
-      // Find a split point: ". X" or "! X" or "? X" where X is uppercase,
-      // or punctuation at end of buffer.
       const match = this.buffer.match(/[.!?](\s+[A-Z]|\s*$)/);
       if (!match) break;
 
-      const splitIndex = match.index + 1; // include the punctuation mark
+      const splitIndex = match.index + 1;
       const candidate = this.buffer.substring(0, splitIndex).trim();
       const words = candidate.split(/\s+/);
 
-      // Must have at least 4 words to be a plausible sentence
       if (words.length < 4) break;
 
-      // Check if the last "word" before punctuation is an abbreviation
-      // e.g., "U.S." — strip the trailing punctuation to check
       const lastWord = words[words.length - 1]
         .replace(/[.!?]+$/, "")
         .toLowerCase();
       if (this.ABBREVIATIONS.has(lastWord)) break;
 
-      // Also check for numeric patterns like "3.5" or "$2.1" — don't split on decimal points
       if (/\d\.\d/.test(candidate.slice(-6))) break;
 
-      // Valid split — flush the sentence
-      this._flushSentence(candidate);
+      this._flushSentence(candidate, "punctuation");
       this.buffer = this.buffer.substring(splitIndex).trim();
       didFlush = true;
     }
   }
 
   /**
-   * Strategy B — Adaptive timeout.
+   * Strategy B — Pause detection timer.
    *
-   * Computes timeout from the current speaking rate (words per second).
-   * Slower speakers get longer timeouts, faster speakers get shorter ones.
+   * Renamed from `_resetAdaptiveTimeout` for semantic clarity (10.2.a).
+   *
+   * When the timer fires, cross-references the bufferSnapshot word count against
+   * the internal buffer word count (10.2.b):
+   *   - Match → confirmed pause → flush immediately.
+   *   - Mismatch → allow one heartbeat deferral → then force-flush.
+   *
+   * Hard-pause shortcut (10.2.c): if the gap since lastChunkArrival exceeds
+   * 1.5× the computed timeout, force-flush immediately with no deferral.
    */
-  _resetAdaptiveTimeout() {
-    if (this.flushTimer) {
-      clearTimeout(this.flushTimer);
-      this.flushTimer = null;
+  _resetPauseDetectionTimer() {
+    if (this.pauseDetectionTimer) {
+      clearTimeout(this.pauseDetectionTimer);
+      this.pauseDetectionTimer = null;
     }
 
-    // Don't set a timer if buffer is empty
     if (!this.buffer.trim()) return;
 
     const timeout = this._computeAdaptiveTimeout();
 
-    this.flushTimer = setTimeout(() => {
-      if (this.buffer.trim()) {
-        this._flushSentence(this.buffer.trim());
+    this.pauseDetectionTimer = setTimeout(() => {
+      if (!this.buffer.trim()) return;
+
+      // 10.2.c — Hard pause: gap since last chunk exceeds 1.5× timeout
+      const gap = Date.now() - this.lastChunkArrival;
+      if (gap >= timeout * 1.5) {
+        console.log("StreamBuffer: Hard pause detected — force-flushing.");
+        this._flushSentence(this.buffer.trim(), "hard_pause");
         this.buffer = "";
+        return;
+      }
+
+      // 10.2.b — Confirm pause via bufferSnapshot word count
+      const snapshotWords = this.lastSnapshot
+        ? this.lastSnapshot.trim().split(/\s+/).filter(Boolean).length
+        : 0;
+      const bufferWords = this.buffer.trim().split(/\s+/).filter(Boolean).length;
+
+      if (snapshotWords > 0 && snapshotWords === bufferWords) {
+        // Snapshot and buffer agree — this is a real pause
+        console.log("StreamBuffer: Pause confirmed via snapshot — flushing.");
+        this._flushSentence(this.buffer.trim(), "pause_confirmed");
+        this.buffer = "";
+      } else {
+        // Counts differ — data might still be in flight; defer one heartbeat
+        if (!this._pendingDeferral) {
+          console.log("StreamBuffer: Pause unconfirmed — deferring one heartbeat.");
+          this._pendingDeferral = true;
+          // Force-flush when the heartbeat fires (heartbeat is already running)
+          // Re-arm a one-shot deferral flush after HEARTBEAT_MS
+          setTimeout(() => {
+            if (this.buffer.trim() && this._pendingDeferral) {
+              console.log("StreamBuffer: Deferral elapsed — force-flushing.");
+              this._flushSentence(this.buffer.trim(), "deferred_flush");
+              this.buffer = "";
+              this._pendingDeferral = false;
+            }
+          }, this.HEARTBEAT_MS);
+        }
       }
     }, timeout);
   }
@@ -172,13 +240,10 @@ class StreamBuffer {
     const wps = this._getWordsPerSecond();
 
     if (wps <= 0) {
-      // No data yet — use a reasonable default
       return 1200;
     }
 
-    // Time for one "average sentence" to be spoken, in ms
     const rawTimeout = (this.AVG_WORDS_PER_SENTENCE / wps) * 1000;
-
     return Math.max(this.MIN_TIMEOUT, Math.min(this.MAX_TIMEOUT, rawTimeout));
   }
 
@@ -190,15 +255,18 @@ class StreamBuffer {
   _checkSafetyValve() {
     const words = this.buffer.trim().split(/\s+/);
     if (words.length >= this.MAX_BUFFER_WORDS) {
-      // Try to find the best split point near the middle
       const midpoint = Math.floor(words.length / 2);
       let bestSplit = midpoint;
 
-      // Look for a natural break (comma, semicolon, conjunction) near the midpoint
       for (let i = midpoint - 5; i <= midpoint + 5 && i < words.length; i++) {
         if (i < 0) continue;
         const word = words[i];
-        if (/[,;]$/.test(word) || ["and", "but", "or", "so", "yet", "because", "while", "when", "then"].includes(word.toLowerCase())) {
+        if (
+          /[,;]$/.test(word) ||
+          ["and", "but", "or", "so", "yet", "because", "while", "when", "then"].includes(
+            word.toLowerCase()
+          )
+        ) {
           bestSplit = i + 1;
           break;
         }
@@ -206,7 +274,7 @@ class StreamBuffer {
 
       const sentence = words.slice(0, bestSplit).join(" ");
       this.buffer = words.slice(bestSplit).join(" ");
-      this._flushSentence(sentence);
+      this._flushSentence(sentence, "safety_valve");
     }
   }
 
@@ -219,7 +287,9 @@ class StreamBuffer {
     if (this.wordTimestamps.length < 2) return 0;
 
     const totalWords = this.wordTimestamps.reduce((sum, entry) => sum + entry.count, 0);
-    const timeSpan = this.wordTimestamps[this.wordTimestamps.length - 1].time - this.wordTimestamps[0].time;
+    const timeSpan =
+      this.wordTimestamps[this.wordTimestamps.length - 1].time -
+      this.wordTimestamps[0].time;
 
     if (timeSpan <= 0) return 0;
 
@@ -239,21 +309,12 @@ class StreamBuffer {
    *
    * Finds the longest prefix of `sentenceWords` that matches a suffix of
    * `this.emittedWords`, and returns only the non-overlapping tail.
-   *
-   * Example:
-   *   emittedWords = [..., "holder", "of", "the", "time", "Spider-Man", "3's", "60", "million"]
-   *   sentenceWords = ["of", "the", "time", "Spider-Man", "3's", "60", "million", "dollars", "in", "sales"]
-   *   → overlap length: 7 ("of the time Spider-Man 3's 60 million")
-   *   → returns: ["dollars", "in", "sales"]
    */
   _stripOverlapWithLedger(sentenceWords) {
     if (this.emittedWords.length === 0 || sentenceWords.length === 0) {
       return sentenceWords;
     }
 
-    // Find the longest prefix of sentenceWords that matches a suffix of emittedWords.
-    // Require at least 2 matching words to avoid false positives on common words
-    // like "the", "a", "is" that could coincidentally appear at both boundaries.
     const MIN_OVERLAP_WORDS = 2;
     const maxOverlap = Math.min(this.emittedWords.length, sentenceWords.length);
 
@@ -262,7 +323,6 @@ class StreamBuffer {
       for (let i = 0; i < overlapLen; i++) {
         const ledgerWord = this.emittedWords[this.emittedWords.length - overlapLen + i];
         const sentenceWord = sentenceWords[i];
-        // Case-insensitive comparison for robustness
         if (ledgerWord.toLowerCase() !== sentenceWord.toLowerCase()) {
           matches = false;
           break;
@@ -276,7 +336,6 @@ class StreamBuffer {
       }
     }
 
-    // No overlap found
     return sentenceWords;
   }
 
@@ -284,22 +343,24 @@ class StreamBuffer {
    * Flush a complete sentence. Uses the Global Word Ledger to strip any
    * overlapping prefix (words already emitted), then appends the new words
    * to the ledger.
+   *
+   * @param {string} sentence      — The candidate sentence text.
+   * @param {string} flushMethod   — Label for stats() (e.g. "punctuation").
    */
-  _flushSentence(sentence) {
+  _flushSentence(sentence, flushMethod = "unknown") {
     const trimmed = sentence.trim();
     if (!trimmed) return;
 
-    // Cancel any pending adaptive timeout
-    if (this.flushTimer) {
-      clearTimeout(this.flushTimer);
-      this.flushTimer = null;
+    // Cancel any pending pause detection timer
+    if (this.pauseDetectionTimer) {
+      clearTimeout(this.pauseDetectionTimer);
+      this.pauseDetectionTimer = null;
     }
 
     // Tokenize and strip overlap with the Global Word Ledger
     const sentenceWords = trimmed.split(/\s+/);
     const newWords = this._stripOverlapWithLedger(sentenceWords);
 
-    // If all words were already emitted, suppress entirely
     if (newWords.length === 0) {
       console.log("StreamBuffer: Fully overlapping sentence suppressed:", trimmed);
       return;
@@ -309,6 +370,7 @@ class StreamBuffer {
 
     // Append new words to the ledger
     this.emittedWords.push(...newWords);
+    this._emittedTotal += newWords.length;
 
     // Cap ledger size to prevent unbounded memory growth
     if (this.emittedWords.length > this.MAX_LEDGER_WORDS) {
@@ -317,14 +379,15 @@ class StreamBuffer {
       );
     }
 
-    console.log("StreamBuffer: Sentence ready:", dedupedSentence);
+    this._lastFlushMethod = flushMethod;
+    console.log(`StreamBuffer [${flushMethod}]: Sentence ready:`, dedupedSentence);
     this.onSentenceReady(dedupedSentence);
   }
 
   /**
    * Heartbeat timer — flushes stale buffer content when no new chunks
    * arrive within HEARTBEAT_MS. Handles edge cases like video pausing
-   * mid-sentence or a segment ending without triggering the adaptive timeout.
+   * mid-sentence or a segment ending without triggering the pause detector.
    */
   _resetHeartbeat() {
     if (this.heartbeatTimer) {
@@ -335,22 +398,44 @@ class StreamBuffer {
     this.heartbeatTimer = setTimeout(() => {
       if (this.buffer.trim()) {
         console.log("StreamBuffer: Heartbeat flush — draining stale buffer");
-        this._flushSentence(this.buffer.trim());
+        this._flushSentence(this.buffer.trim(), "heartbeat");
         this.buffer = "";
       }
     }, this.HEARTBEAT_MS);
   }
 
   /**
-   * Reset all state (e.g., when disconnecting).
+   * Milestone 10.2.e — Debug stats snapshot.
+   *
+   * @returns {{ bufferWords: number, emittedTotal: number, wps: number, lastFlushMethod: string }}
+   */
+  stats() {
+    const bufferWords = this.buffer.trim()
+      ? this.buffer.trim().split(/\s+/).length
+      : 0;
+    return {
+      bufferWords,
+      emittedTotal: this._emittedTotal,
+      wps: Math.round(this._getWordsPerSecond() * 10) / 10,
+      lastFlushMethod: this._lastFlushMethod,
+    };
+  }
+
+  /**
+   * Reset all state (e.g., when disconnecting or on CLEAR_BUFFER).
    */
   reset() {
     this.buffer = "";
+    this.lastSnapshot = "";
+    this.lastChunkArrival = 0;
+    this._pendingDeferral = false;
     this.wordTimestamps = [];
     this.emittedWords = [];
-    if (this.flushTimer) {
-      clearTimeout(this.flushTimer);
-      this.flushTimer = null;
+    this._emittedTotal = 0;
+    this._lastFlushMethod = "none";
+    if (this.pauseDetectionTimer) {
+      clearTimeout(this.pauseDetectionTimer);
+      this.pauseDetectionTimer = null;
     }
     if (this.heartbeatTimer) {
       clearTimeout(this.heartbeatTimer);
@@ -364,8 +449,6 @@ class StreamBuffer {
 // ============================================================================
 
 const streamBuffer = new StreamBuffer((sentence) => {
-  // This callback is invoked when the buffer produces a complete sentence.
-  // It mirrors the old handleCapturedTranscript() behavior.
   handleSegmentedSentence(sentence);
 });
 
@@ -373,10 +456,10 @@ const streamBuffer = new StreamBuffer((sentence) => {
 // Chrome Extension Lifecycle
 // ============================================================================
 
-// Ensure side panel opens when the extension icon is clicked
 chrome.runtime.onInstalled.addListener(() => {
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
-    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+    chrome.sidePanel
+      .setPanelBehavior({ openPanelOnActionClick: true })
       .catch((error) => console.error("Error setting panel behavior:", error));
   }
 });
@@ -388,16 +471,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "DISCONNECT") {
     disconnectWebSocket();
   } else if (message.action === "CAPTION_CHUNK") {
-    // New: raw word chunks from content.js feed into the StreamBuffer
-    streamBuffer.addChunk(message.text);
+    // 10.2.d — pass both text and bufferSnapshot into the StreamBuffer
+    streamBuffer.addChunk(message.text, message.bufferSnapshot || "");
   } else if (message.action === "TRANSCRIPT_CAPTURED") {
     // Legacy: still accept pre-formed sentences (e.g., from other sources)
     handleSegmentedSentence(message.text);
+  } else if (message.action === "CLEAR_BUFFER") {
+    streamBuffer.reset();
+    console.log("StreamBuffer: reset via CLEAR_BUFFER message.");
   }
 });
 
 // ============================================================================
-// WebSocket Management (unchanged)
+// WebSocket Management
 // ============================================================================
 
 function connectWebSocket(url) {
@@ -419,7 +505,6 @@ function connectWebSocket(url) {
         if (data.text) {
           chrome.storage.local.get("logs", (store) => {
             const logs = store.logs || [];
-            // Find existing log entry to attach the verdict/report
             const existingLog = logs.find((l) => l.text === data.text);
             if (existingLog) {
               existingLog.report = data.report;
@@ -427,10 +512,9 @@ function connectWebSocket(url) {
               logs.push({
                 timestamp: Date.now(),
                 text: data.text,
-                report: data.report
+                report: data.report,
               });
             }
-            // Cap history to 50 items
             if (logs.length > 50) {
               logs.shift();
             }
@@ -469,31 +553,22 @@ function disconnectWebSocket() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
-  // Reset stream buffer on disconnect to clear stale state
   streamBuffer.reset();
   chrome.storage.local.set({ isRunning: false });
 }
 
 // ============================================================================
-// Sentence Handling (replaces old handleCapturedTranscript)
+// Sentence Handling
 // ============================================================================
 
 /**
  * Handle a fully segmented sentence — send it to the backend and log it.
- * This is called by the StreamBuffer when it produces a complete sentence,
- * or directly via the legacy TRANSCRIPT_CAPTURED action.
  */
 function handleSegmentedSentence(text) {
   if (!text || !text.trim()) return;
 
   const cleanText = text.trim();
 
-  // NOTE: No minimum word-count filter here. The Global Word Ledger in
-  // StreamBuffer may produce short fragments (1-3 words) after stripping
-  // overlap, and these are legitimate new content that must not be dropped.
-  // The server-side filter in websocket.py handles junk rejection.
-
-  // Send to backend via WebSocket if connected
   if (socket && socket.readyState === WebSocket.OPEN) {
     const payload = JSON.stringify({ sentence: cleanText });
     socket.send(payload);
@@ -502,15 +577,13 @@ function handleSegmentedSentence(text) {
     console.log("Cannot send sentence: WebSocket is not open.");
   }
 
-  // Record log locally
   chrome.storage.local.get("logs", (data) => {
     const logs = data.logs || [];
-    // Only add if not already present
     if (!logs.some((l) => l.text === cleanText)) {
       logs.push({
         timestamp: Date.now(),
         text: cleanText,
-        report: null
+        report: null,
       });
       if (logs.length > 50) {
         logs.shift();

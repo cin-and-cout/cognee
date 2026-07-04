@@ -1,13 +1,19 @@
 console.log("Live Claim Consistency Tracker content script initialized.");
 
 /**
- * Word-level YouTube caption stream collector.
+ * Word-level YouTube caption stream collector — Milestone 10.1
  *
- * Instead of trying to detect sentence boundaries, this script:
- *   1. Observes .ytp-caption-segment DOM mutations (debounced 150ms).
- *   2. Flattens all visible caption text into a flat word array.
- *   3. Diffs word-by-word against the previous snapshot.
- *   4. Emits only genuinely *new* words as a CAPTION_CHUNK to background.js.
+ * Changes from Milestone 9:
+ *   - Maintains a `globalWordBuffer` (append-only, no cap) as the canonical
+ *     session-level truth of every word ever seen from captions.
+ *   - Attaches a `bufferSnapshot` (last 100 words joined as a string) to every
+ *     CAPTION_CHUNK message so background.js can cross-reference during
+ *     pause-based sentence segmentation.
+ *   - Adds `resetBuffer()` hooked to YouTube's `yt-navigate-finish` event to
+ *     clear state cleanly on video navigation.
+ *   - Removes the redundant `isDuplicate()` / `recentChunks` rolling window —
+ *     the Global Word Ledger in background.js is strictly more powerful and
+ *     supersedes it entirely.
  *
  * The 150ms debounce prevents capturing mid-render partial words (e.g. "SECURIT"
  * instead of "SECURITY") that YouTube writes character-by-character.
@@ -16,10 +22,17 @@ console.log("Live Claim Consistency Tracker content script initialized.");
  */
 
 // --- State ---
-let previousWords = [];      // flat word array from last observation
-let recentChunks = [];       // rolling dedup window (last N emitted chunks)
-const DEDUP_WINDOW = 10;
-let debounceTimer = null;    // MutationObserver debounce timer
+
+/**
+ * Append-only session log of every word seen from captions.
+ * No cap — this is the canonical truth for the current video session.
+ * Attached as a `bufferSnapshot` (last 100 words) on every CAPTION_CHUNK.
+ */
+let globalWordBuffer = [];
+
+let previousWords = [];   // flat word array from last caption observation
+let debounceTimer = null; // MutationObserver debounce timer
+let captionObserver = null; // MutationObserver instance (kept for reset)
 
 // --- Core diff algorithm (word-level) ---
 
@@ -68,29 +81,16 @@ function computeNewWords(prev, curr) {
   return curr;
 }
 
-// --- Deduplication ---
-
-/**
- * Check if this chunk text was recently emitted.
- * Returns true if duplicate.
- */
-function isDuplicate(text) {
-  const normalized = text.toLowerCase().trim();
-  if (recentChunks.includes(normalized)) {
-    return true;
-  }
-  recentChunks.push(normalized);
-  if (recentChunks.length > DEDUP_WINDOW) {
-    recentChunks.shift();
-  }
-  return false;
-}
-
 // --- Debounced caption processing ---
 
 /**
  * Read the current caption DOM state, diff against previous, and emit new words.
  * Called 150ms after the last MutationObserver event (debounced).
+ *
+ * New in Milestone 10.1:
+ *   - Appends new words to `globalWordBuffer` (accumulate only; never replace).
+ *   - Sends `bufferSnapshot` (last 100 words of globalWordBuffer) alongside the
+ *     delta chunk so background.js can confirm pause boundaries.
  */
 function processCaptions() {
   const captionElements = document.querySelectorAll(".ytp-caption-segment");
@@ -115,21 +115,39 @@ function processCaptions() {
   const newWords = computeNewWords(previousWords, currentWords);
   previousWords = [...currentWords];
 
+  if (newWords.length === 0) return;
+
+  // 10.1.b — Accumulate into the global word buffer (never replace)
+  globalWordBuffer.push(...newWords);
+
   const newText = newWords.join(" ").trim();
   if (!newText) return;
 
-  // Deduplicate
-  if (isDuplicate(newText)) {
-    return;
-  }
+  // 10.1.c — Build bufferSnapshot from last 100 words of globalWordBuffer
+  const bufferSnapshot = globalWordBuffer.slice(-100).join(" ");
 
-  // Emit raw word chunk to background worker
+  // Emit raw word chunk + snapshot to background worker
   console.log("Caption chunk:", newText);
   chrome.runtime.sendMessage({
     action: "CAPTION_CHUNK",
     text: newText,
+    bufferSnapshot,
   });
 }
+
+// --- Buffer reset (on video navigation) ---
+
+/**
+ * Reset all session state when the user navigates to a new video.
+ * Hooked to YouTube's yt-navigate-finish document event.
+ */
+function resetBuffer() {
+  console.log("Content script: resetting globalWordBuffer and previousWords on navigation.");
+  globalWordBuffer = [];
+  previousWords = [];
+}
+
+document.addEventListener("yt-navigate-finish", resetBuffer);
 
 // --- DOM Observer (debounced) ---
 
@@ -142,6 +160,8 @@ const observer = new MutationObserver(() => {
   }
   debounceTimer = setTimeout(processCaptions, 150);
 });
+
+captionObserver = observer;
 
 // --- Initialization ---
 
