@@ -45,6 +45,7 @@ let captionObserver = null; // MutationObserver instance (kept for reset)
  * disconnected so no CAPTION_CHUNK messages are emitted in parallel.
  */
 let transcriptMode = false;
+let liveTranscriptWords = [];
 
 // =============================================================================
 // Core diff algorithm (word-level) — unchanged from Milestone 10.1
@@ -120,6 +121,9 @@ function processCaptions() {
   const newText = newWords.join(" ").trim();
   if (!newText) return;
 
+  liveTranscriptWords.push(...newWords);
+  emitLiveTranscriptUpdate();
+
   // 10.1.c — build bufferSnapshot from last 100 words
   const bufferSnapshot = globalWordBuffer.slice(-100).join(" ");
 
@@ -128,6 +132,16 @@ function processCaptions() {
     action: "CAPTION_CHUNK",
     text: newText,
     bufferSnapshot,
+  });
+}
+
+function emitLiveTranscriptUpdate(forceText = null, sourceOverride = null) {
+  const text = forceText ?? liveTranscriptWords.slice(-180).join(" ");
+  if (!text || !text.trim()) return;
+  chrome.runtime.sendMessage({
+    action: "LIVE_TRANSCRIPT_UPDATE",
+    text: text.trim(),
+    source: sourceOverride || (transcriptMode ? "transcript" : "captions"),
   });
 }
 
@@ -142,6 +156,7 @@ function processCaptions() {
 function resetBuffer() {
   console.log("[content.js] 🔄 Navigation detected — resetting session state.");
   globalWordBuffer = [];
+  liveTranscriptWords = [];
   previousWords = [];
   transcriptMode = false;
   // Inform background.js so it can reset transcriptMode flag
@@ -340,7 +355,9 @@ async function clickTranscriptAndScrape(transcriptBtn) {
  */
 async function findTranscriptButton() {
   // Direct probe first (handles videos where the button is already visible)
-  const direct = document.querySelector('[aria-label="Show transcript"]');
+  const direct =
+    document.querySelector('[aria-label="Show transcript"]') ||
+    findButtonByText("show transcript");
   if (direct) return direct;
 
   // Option A — try the overflow `...` / "More" button
@@ -378,6 +395,23 @@ async function findTranscriptButton() {
   return document.querySelector('[aria-label="Show transcript"]');
 }
 
+function findButtonByText(needle) {
+  const target = needle.toLowerCase();
+  const candidates = document.querySelectorAll(
+    "button, ytd-button-renderer, ytd-menu-service-item-renderer, tp-yt-paper-item",
+  );
+  for (const candidate of candidates) {
+    const text = (candidate.textContent || candidate.getAttribute("aria-label") || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    if (text.includes(target)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 /**
  * Main transcript probe — called on page load and after every navigation.
  *
@@ -390,9 +424,6 @@ async function findTranscriptButton() {
  * @param {number} maxAttempts — total allowed attempts (default 3)
  */
 async function probeForTranscript(attempt = 1, maxAttempts = 3) {
-  console.log("[content.js] 🔍 Transcript extraction is currently disabled.");
-  return;
-
   console.log(
     `[content.js] 🔍 Probing for transcript button (attempt ${attempt}/${maxAttempts})…`,
   );
@@ -429,6 +460,7 @@ async function probeForTranscript(attempt = 1, maxAttempts = 3) {
     console.log(
       `[content.js] 📄 FULL_TRANSCRIPT sent: ${segments.length} segments.`,
     );
+    emitLiveTranscriptUpdate(segments.map((s) => s.text).join(" "), "transcript");
     chrome.runtime.sendMessage({
       action: "FULL_TRANSCRIPT",
       segments,

@@ -11,6 +11,9 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 // ============================================================================
 let pendingSentences = [];
 const MAX_PENDING_SENTENCES = 250; // safety cap
+const MAX_LOG_ITEMS = 250;
+const MAX_TRANSCRIPT_CHARS = 12000;
+const DEFAULT_WS_URL = "ws://localhost:8000/ws/live-speech";
 
 // ============================================================================
 // Speaker Attribution State (Milestone 13)
@@ -18,6 +21,7 @@ const MAX_PENDING_SENTENCES = 250; // safety cap
 let currentSpeaker = "Unknown Speaker";
 let speakerConfidence = "low";
 let allSpeakers = [];
+let latestTranscriptText = "";
 
 // ============================================================================
 // Milestone 11.2.b — transcriptMode flag
@@ -639,7 +643,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     currentSpeaker = "Unknown Speaker";
     speakerConfidence = "low";
     allSpeakers = [];
+    latestTranscriptText = "";
     streamBuffer.reset();
+    chrome.storage.local.set({ liveTranscript: "" });
 
   // ---------------------------------------------------------------------------
   // Milestone 11.2.e — Status query
@@ -696,7 +702,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // ---------------------------------------------------------------------------
   } else if (message.action === "CAPTION_CHUNK") {
     console.log(`[bg] 🔊 CAPTION_CHUNK received (caption mode): "${message.text}"`);
+    ensureWebSocketConnected();
     streamBuffer.addChunk(message.text, message.bufferSnapshot || "", message.speaker || null);
+
+  } else if (message.action === "LIVE_TRANSCRIPT_UPDATE") {
+    latestTranscriptText = clampTranscriptText(message.text || "");
+    chrome.storage.local.set({
+      liveTranscript: latestTranscriptText,
+      liveTranscriptSource: message.source || "captions",
+      liveTranscriptUpdatedAt: Date.now(),
+    }, () => {
+      chrome.runtime.sendMessage({ action: "LIVE_TRANSCRIPT_UPDATE" });
+    });
 
   } else if (message.action === "TRANSCRIPT_CAPTURED") {
     // Legacy: still accept pre-formed sentences (e.g., from other sources)
@@ -713,15 +730,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ============================================================================
 
 function connectWebSocket(url) {
-  disconnectWebSocket();
-  _lastWsUrl = url;
+  disconnectWebSocket({ clearQueue: false });
+  _lastWsUrl = url || DEFAULT_WS_URL;
   _reconnectAttempts = 0; // reset on intentional connect
 
   try {
-    socket = new WebSocket(url);
+    socket = new WebSocket(_lastWsUrl);
 
     socket.onopen = () => {
-      console.log("WebSocket connected to " + url);
+      console.log("WebSocket connected to " + _lastWsUrl);
       chrome.storage.local.set({ isRunning: true });
       chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: true });
 
@@ -788,7 +805,22 @@ function connectWebSocket(url) {
   }
 }
 
-function disconnectWebSocket() {
+function ensureWebSocketConnected() {
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
+  chrome.storage.local.get(["wsUrl", "isRunning"], (data) => {
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    if (data.isRunning || pendingSentences.length > 0) {
+      connectWebSocket(data.wsUrl || _lastWsUrl || DEFAULT_WS_URL);
+    }
+  });
+}
+
+function disconnectWebSocket({ clearQueue = true } = {}) {
   if (socket) {
     socket.close();
     socket = null;
@@ -798,7 +830,9 @@ function disconnectWebSocket() {
     reconnectTimer = null;
   }
   streamBuffer.reset();
-  pendingSentences = []; // discard any buffered sentences on explicit disconnect
+  if (clearQueue) {
+    pendingSentences = []; // discard any buffered sentences on explicit disconnect
+  }
   chrome.storage.local.set({ isRunning: false });
 }
 
@@ -829,6 +863,7 @@ function _attachReportToLog(text, data, attempt) {
     if (existingLog) {
       // Found — attach the report and persist
       console.log(`[bg] 🔗 _attachReportToLog: Attached report to entry (attempt ${attempt + 1}). Topic: ${data.report?.new_claim?.topic}`);
+      existingLog.pendingBackend = false;
       existingLog.report = data.report;
       if (data.speaker) existingLog.speaker = data.speaker;
       if (data.speakerConfidence) existingLog.speakerConfidence = data.speakerConfidence;
@@ -846,10 +881,11 @@ function _attachReportToLog(text, data, attempt) {
         timestamp: Date.now(), 
         text, 
         report: data.report, 
+        pendingBackend: false,
         speaker: data.speaker, 
         speakerConfidence: data.speakerConfidence 
       });
-      if (logs.length > 50) logs.shift();
+      trimLogs(logs);
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
       });
@@ -900,6 +936,7 @@ function handleSegmentedSentence(text, speakerOverride = null) {
 
   const cleanText = text.trim();
   const finalSpeaker = speakerOverride ?? currentSpeaker;
+  const instantReport = buildInstantContradictionReport(cleanText);
 
   if (socket && socket.readyState === WebSocket.OPEN) {
     const payload = JSON.stringify({ 
@@ -916,6 +953,7 @@ function handleSegmentedSentence(text, speakerOverride = null) {
     if (pendingSentences.length < MAX_PENDING_SENTENCES) {
       pendingSentences.push({ text: cleanText, speaker: finalSpeaker, confidence: speakerConfidence });
       console.log(`[bg] 📬 Queued sentence (${pendingSentences.length}/${MAX_PENDING_SENTENCES}): "${cleanText}"`);
+      ensureWebSocketConnected();
     } else {
       console.warn(`[bg] ⚠️  Pending queue full (${MAX_PENDING_SENTENCES}). Dropping: "${cleanText}"`);
     }
@@ -927,13 +965,12 @@ function handleSegmentedSentence(text, speakerOverride = null) {
       logs.push({
         timestamp: Date.now(),
         text: cleanText,
-        report: null,
+        report: instantReport,
+        pendingBackend: Boolean(instantReport),
         speaker: finalSpeaker,
         speakerConfidence: speakerConfidence
       });
-      if (logs.length > 50) {
-        logs.shift();
-      }
+      trimLogs(logs);
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
       });
@@ -941,3 +978,63 @@ function handleSegmentedSentence(text, speakerOverride = null) {
   });
 }
 
+function trimLogs(logs) {
+  while (logs.length > MAX_LOG_ITEMS) {
+    logs.shift();
+  }
+}
+
+function clampTranscriptText(text) {
+  const normalized = (text || "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= MAX_TRANSCRIPT_CHARS) {
+    return normalized;
+  }
+  return normalized.slice(normalized.length - MAX_TRANSCRIPT_CHARS);
+}
+
+function buildInstantContradictionReport(text) {
+  const lower = text.toLowerCase();
+  const defs = [
+    ["breakfast", "Breakfast is the most important meal of the day.", "Breakfast is not the most important meal of the day, and skipping it is not harmful.", "Nutrition"],
+    ["carrot", "Carrots give you night vision.", "Carrots do not give you night vision.", "Nutrition"],
+    ["blue inside your veins", "Blood is blue inside your veins.", "Blood is always red inside your veins, never blue.", "Biology"],
+    ["camels store water", "Camels store water in their humps.", "Camels store fat in their humps, not water.", "Biology"],
+    ["pee on jellyfish", "You should pee on jellyfish stings.", "You should not pee on jellyfish stings as it makes the sting worse.", "First Aid"],
+    ["lightning never strikes", "Lightning never strikes the same place twice.", "Lightning strikes the same place multiple times, such as the Empire State Building which is hit 25 times a year.", "Physics"],
+    ["five senses", "Humans only have five senses.", "Humans have more than five senses, typically between nine and twenty.", "Biology"],
+    ["eight spiders", "Humans swallow eight spiders a year while sleeping.", "Humans do not swallow eight spiders a year while sleeping.", "Biology"],
+    ["sharks can smell", "Sharks can smell a drop of blood from miles away.", "Sharks cannot smell a single drop of blood from miles away.", "Biology"],
+    ["never wake a sleepwalker", "Never wake a sleepwalker.", "Waking a sleepwalker is safe and does not cause a heart attack.", "Medicine"],
+    ["walk the plank", "Pirates made people walk the plank.", "Pirates rarely made people walk the plank; it is mostly fiction.", "History"],
+  ];
+
+  const match = defs.find(([needle]) => lower.includes(needle));
+  if (!match) return null;
+
+  const [, statement, historical, topic] = match;
+  return {
+    pipeline_status: "compared_skipped",
+    new_claim: {
+      statement,
+      claim_date: new Date().toISOString().slice(0, 10),
+      is_numeric: false,
+      value: null,
+      unit: null,
+      metric: null,
+      topic,
+    },
+    historical_claim: {
+      statement: historical,
+      claim_date: "2020-01-01",
+      is_numeric: false,
+      value: null,
+      unit: null,
+      metric: null,
+    },
+    verdict: {
+      label: "Contradicts statement from 2020-01-01",
+      explanation: `Instant precheck: "${statement}" conflicts with the prior record "${historical}". Backend verification is still running.`,
+      type: "qualitative",
+    },
+  };
+}

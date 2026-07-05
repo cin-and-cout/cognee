@@ -8,6 +8,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const snackbar          = document.getElementById("snackbar");
   const snackbarUndo      = document.getElementById("snackbar-undo");
   const transcriptBadge   = document.getElementById("transcript-mode-badge");
+  const liveTranscriptText = document.getElementById("live-transcript-text");
+  const liveTranscriptSource = document.getElementById("live-transcript-source");
 
   // In-memory snapshot used by the Undo action (task 12.1.d)
   let _preClearSnapshot = null;
@@ -17,9 +19,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialise
   // ============================================================================
 
-  chrome.storage.local.get(["wsUrl", "isRunning", "logs"], (data) => {
+  chrome.storage.local.get(["wsUrl", "isRunning", "logs", "liveTranscript", "liveTranscriptSource"], (data) => {
     if (data.wsUrl) wsUrlInput.value = data.wsUrl;
     updateUI(data.isRunning || false);
+    renderLiveTranscript(data.liveTranscript || "", data.liveTranscriptSource || "waiting");
     renderFeed(data.logs || []);
   });
 
@@ -96,6 +99,10 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (message.action === "TRANSCRIPT_MODE_CHANGED") {
       // 11.2.e — real-time badge update
       setTranscriptBadge(message.transcriptMode);
+    } else if (message.action === "LIVE_TRANSCRIPT_UPDATE") {
+      chrome.storage.local.get(["liveTranscript", "liveTranscriptSource"], (data) => {
+        renderLiveTranscript(data.liveTranscript || "", data.liveTranscriptSource || "captions");
+      });
     }
   });
 
@@ -124,6 +131,21 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       transcriptBadge.classList.add("hidden");
     }
+  }
+
+  function renderLiveTranscript(text, source) {
+    const trimmed = (text || "").trim();
+    liveTranscriptSource.textContent = trimmed ? source : "Waiting";
+    if (!trimmed) {
+      liveTranscriptText.classList.add("empty");
+      liveTranscriptText.textContent =
+        "Speech text will appear here as soon as captions or a transcript are captured.";
+      return;
+    }
+
+    liveTranscriptText.classList.remove("empty");
+    liveTranscriptText.textContent = trimmed;
+    liveTranscriptText.scrollTop = liveTranscriptText.scrollHeight;
   }
 
   // ============================================================================
@@ -198,7 +220,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const savedSuffix     = saved ? "" : " (Not Saved)";
 
       if (isContradiction) {
-        badgeHtml = `<span class="verdict-badge contradiction">🚨 Claim Inconsistent${savedSuffix}</span>`;
+        const prefix = log.pendingBackend ? "Instant: " : "";
+        badgeHtml = `<span class="verdict-badge contradiction">🚨 ${prefix}Claim Inconsistent${savedSuffix}</span>`;
       } else if (isConsistent) {
         badgeHtml = `<span class="verdict-badge consistent">✓ Consistent${savedSuffix}</span>`;
       } else {
@@ -235,6 +258,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Per-report blocks ---
     if (log.report && log.report.pipeline_status !== "no_claim") {
       wrapper.appendChild(buildReportBlock(log.report));
+      if (log.pendingBackend) {
+        const pending = document.createElement("div");
+        pending.className = "log-explanation";
+        pending.textContent = "Backend verification running.";
+        wrapper.appendChild(pending);
+      }
     }
 
     return wrapper;
