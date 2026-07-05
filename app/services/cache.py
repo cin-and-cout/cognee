@@ -1,6 +1,9 @@
 import json
 import os
+import logging
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 CACHE_FILE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -22,9 +25,12 @@ def load_cache():
                 raw_data = json.load(f)
                 # Normalize keys to lowercase, stripped text
                 _cache = {k.strip().lower(): v for k, v in raw_data.items()}
-        except Exception:
+            logger.info("Cache file loaded", extra={"file_path": CACHE_FILE_PATH, "entry_count": len(_cache)})
+        except Exception as e:
+            logger.warning("Cache file parse error", extra={"error": str(e)})
             _cache = {}
     else:
+        logger.info("Cache file missing - starting empty", extra={"file_path": CACHE_FILE_PATH})
         _cache = {}
 
 
@@ -35,7 +41,13 @@ def get_cached_verdict(text: str) -> Optional[Dict[str, Any]]:
     if not _cache:
         load_cache()
     key = text.strip().lower()
-    return _cache.get(key)
+    res = _cache.get(key)
+    key_preview = key[:60] + "..." if len(key) > 60 else key
+    if res:
+        logger.debug("Cache hit", extra={"key_preview": key_preview})
+    else:
+        logger.debug("Cache miss", extra={"key_preview": key_preview})
+    return res
 
 
 def set_cached_verdict(text: str, report: Dict[str, Any]):
@@ -44,11 +56,14 @@ def set_cached_verdict(text: str, report: Dict[str, Any]):
     """
     key = text.strip().lower()
     _cache[key] = report
+    key_preview = key[:60] + "..." if len(key) > 60 else key
+    logger.debug("Cache write", extra={"key_preview": key_preview, "cache_size": len(_cache)})
 
     try:
         os.makedirs(os.path.dirname(CACHE_FILE_PATH), exist_ok=True)
         # We save the cache back with the normalized keys
         with open(CACHE_FILE_PATH, "w", encoding="utf-8") as f:
             json.dump(_cache, f, indent=4)
-    except Exception:
-        pass
+        logger.debug("Cache file save succeeded", extra={"file_path": CACHE_FILE_PATH, "entry_count": len(_cache)})
+    except Exception as e:
+        logger.warning("Cache file save failed", extra={"error": str(e)})

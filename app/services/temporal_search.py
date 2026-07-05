@@ -1,10 +1,14 @@
 from datetime import datetime
+import time
+import logging
 from typing import List, Optional
 from uuid import UUID
 
 from cognee.infrastructure.databases.graph import get_graph_engine
 
 from app.schemas import Claim, Politician, Topic
+
+logger = logging.getLogger(__name__)
 
 
 async def get_historical_claims(
@@ -17,8 +21,14 @@ async def get_historical_claims(
 
     Returns the list of Claims sorted by claim_date descending (newest first).
     """
+    logger.info("get_historical_claims called", extra={"topic_name": topic_name, "politician_name": politician_name})
+    
+    start_time = time.time()
     graph_engine = await get_graph_engine()
+    logger.debug("Graph engine acquired", extra={"engine_type": type(graph_engine).__name__})
     nodes, edges = await graph_engine.get_graph_data()
+    latency_ms = int((time.time() - start_time) * 1000)
+    logger.debug("Graph data fetched", extra={"node_count": len(nodes), "edge_count": len(edges), "latency_ms": latency_ms})
 
     # Create a mapping of string IDs to node properties for fast lookup
     node_map = {str(node_id): props for node_id, props in nodes}
@@ -32,7 +42,9 @@ async def get_historical_claims(
         ):
             target_topic_ids.add(str(node_id))
 
+    logger.debug("Topic nodes found", extra={"topic_count": len(target_topic_ids)})
     if not target_topic_ids:
+        logger.info("No matching topic nodes found, returning early", extra={"topic_name": topic_name})
         return []
 
     # Find the target Politician node ID(s) if politician_name is provided
@@ -44,7 +56,9 @@ async def get_historical_claims(
                 and props.get("name", "").strip().lower() == politician_name.strip().lower()
             ):
                 target_politician_ids.add(str(node_id))
+        logger.debug("Politician nodes found", extra={"politician_count": len(target_politician_ids)})
         if not target_politician_ids:
+            logger.info("No matching politician nodes found, returning early", extra={"politician_name": politician_name})
             return []
 
     # Map claim_id to its connected topic and politician IDs
@@ -120,14 +134,18 @@ async def get_historical_claims(
 
         matching_claims.append(claim_obj)
 
+    logger.info("Claims filtered and matched", extra={"total_claims_in_db": len(claim_connections), "matched_claims": len(matching_claims)})
+
     # Sort matching claims by claim_date descending
     def get_date(c: Claim) -> datetime:
         try:
             return datetime.strptime(c.claim_date, "%Y-%m-%d")
-        except Exception:
+        except Exception as e:
+            logger.warning("Exception during date reconstruction", extra={"claim_id": str(c.id), "error": str(e)})
             return datetime.min
 
     matching_claims.sort(key=get_date, reverse=True)
+    logger.info("Returning historical claims", extra={"returned_count": len(matching_claims)})
     return matching_claims
 
 

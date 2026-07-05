@@ -1,6 +1,9 @@
 import asyncio
 import time
+import logging
 from typing import Dict, List
+
+logger = logging.getLogger(__name__)
 
 class AllKeysExhaustedError(Exception):
     """Raised when all LLM API keys are currently in cooldown."""
@@ -13,9 +16,11 @@ class LLMKeyPool:
         self._cooldowns: Dict[str, float] = {}
         self._cooldown_duration = cooldown_duration
         self._lock = asyncio.Lock()
+        logger.info("Key pool initialized", extra={"keys_loaded": len(keys)})
 
     async def next_key(self) -> str:
         if not self._keys:
+            logger.error("All keys exhausted", extra={"total_keys": 0, "cooldowns": {}})
             raise AllKeysExhaustedError("No keys provided to the pool.")
             
         async with self._lock:
@@ -28,23 +33,36 @@ class LLMKeyPool:
                 
                 cooldown_time = self._cooldowns.get(key, 0)
                 if now - cooldown_time >= self._cooldown_duration:
+                    if cooldown_time > 0:
+                        key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
+                        logger.info("Key cooldown expired", extra={"key_preview": key_preview})
+                        self._cooldowns[key] = 0
+                        
+                    key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
+                    available = self._available_count_unlocked(now)
+                    logger.debug("Key selected for call", extra={"key_preview": key_preview, "index": (self._index - 1) % len(self._keys), "available_count": available})
                     return key
                     
                 if self._index == start_index:
+                    logger.error("All keys exhausted", extra={"total_keys": len(self._keys), "cooldowns": self._cooldown_status_unlocked(now)})
                     raise AllKeysExhaustedError("All keys are currently exhausted and on cooldown.")
 
     def mark_rate_limited(self, key: str):
         self._cooldowns[key] = time.time()
+        key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
+        available = self.available_count()
+        logger.warning("Key placed on cooldown", extra={"key_preview": key_preview, "available_count": available, "cooldown_seconds": self._cooldown_duration})
 
-    def available_count(self) -> int:
-        now = time.time()
+    def _available_count_unlocked(self, now: float) -> int:
         return sum(
             1 for key in self._keys 
             if now - self._cooldowns.get(key, 0) >= self._cooldown_duration
         )
 
-    def cooldown_status(self) -> Dict[str, float]:
-        now = time.time()
+    def available_count(self) -> int:
+        return self._available_count_unlocked(time.time())
+
+    def _cooldown_status_unlocked(self, now: float) -> Dict[str, float]:
         status = {}
         for key in self._keys:
             cooldown_time = self._cooldowns.get(key, 0)
@@ -52,3 +70,6 @@ class LLMKeyPool:
             key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
             status[key_preview] = remaining
         return status
+
+    def cooldown_status(self) -> Dict[str, float]:
+        return self._cooldown_status_unlocked(time.time())

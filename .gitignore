@@ -66,3 +66,4 @@ pyrightconfig.json
 .env
 .cognee_system/
 .ruff_cache/
+logs/

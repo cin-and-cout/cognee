@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import time as _time
 from collections import deque
 from datetime import datetime, timezone
 
@@ -31,6 +32,8 @@ async def websocket_live_speech(websocket: WebSocket):
       - Deduplicates against a rolling window of recent sentence hashes.
     """
     await websocket.accept()
+    client = f"{websocket.client.host}:{websocket.client.port}" if websocket.client else "unknown"
+    logger.info("WebSocket connection opened", extra={"client": client})
 
     # Per-connection deduplication window
     recent_hashes: deque[str] = deque(maxlen=DEDUP_WINDOW_SIZE)
@@ -67,11 +70,20 @@ async def websocket_live_speech(websocket: WebSocket):
                 continue
             recent_hashes.append(sentence_hash)
 
-            # Process the incoming live sentence
-            logger.info("📥 [ws] Received sentence (%d words): %s", word_count, sentence)
-            
-            sentence_history.append(sentence)
             sentence_idx += 1
+
+            # ── SENTENCE ARRIVAL BANNER ────────────────────────────────────
+            logger.info("─" * 60)
+            logger.info(
+                "📥 [ws] SENTENCE #%d  (%d words)",
+                sentence_idx, word_count,
+            )
+            logger.info('   text    : "%s"', sentence[:120] + ("…" if len(sentence) > 120 else ""))
+            logger.info("   speaker : %s  (confidence: %s)", speaker, speaker_confidence)
+            # ──────────────────────────────────────────────────────────────
+
+            sentence_history.append(sentence)
+            t_start = _time.perf_counter()
             
             report = None
             try:
@@ -79,18 +91,12 @@ async def websocket_live_speech(websocket: WebSocket):
                     text=sentence,
                     politician_name=speaker,
                     claim_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                    politician_party="Progressive Coalition", # We can look this up in the future
+                    politician_party="Progressive Coalition",  # Can be resolved in the future
                     speaker_confidence=speaker_confidence,
                     sentence_history=sentence_history,
                     speech_context=speech_context,
                     sentence_idx=sentence_idx,
                 )
-                if report and report.get("pipeline_status") != "no_claim":
-                    logger.info(
-                        "✅ [ws] Pipeline complete — verdict: %s, topic: %s",
-                        report.get("verdict", {}).get("label", "unknown"),
-                        report.get("new_claim", {}).get("topic", "unknown")
-                    )
             except Exception as e:
                 # Do NOT re-raise — that would kill the entire WebSocket connection
                 # for all future sentences. Log the error and return a safe error
@@ -101,6 +107,31 @@ async def websocket_live_speech(websocket: WebSocket):
                     "pipeline_status": "error",
                     "error": str(e),
                 }
+
+            elapsed = _time.perf_counter() - t_start
+
+            # ── COMPLETION BANNER ──────────────────────────────────────────
+            status = (report or {}).get("pipeline_status", "unknown")
+            verdict_label = (report or {}).get("verdict", {}).get("label", "")
+            topic = (report or {}).get("new_claim", {}).get("topic", "")
+
+            if status == "no_claim":
+                logger.info("✖  [ws] DONE #%d — not a claim  (%.1fs)", sentence_idx, elapsed)
+            elif status == "error":
+                logger.warning("❌ [ws] DONE #%d — pipeline error  (%.1fs)", sentence_idx, elapsed)
+            elif verdict_label:
+                emoji = "🚨" if "contradict" in verdict_label.lower() else "✅"
+                logger.info(
+                    "%s [ws] DONE #%d — %s | topic=%s | status=%s  (%.1fs)",
+                    emoji, sentence_idx, verdict_label, topic, status, elapsed,
+                )
+            else:
+                logger.info(
+                    "✅ [ws] DONE #%d — status=%s  (%.1fs)",
+                    sentence_idx, status, elapsed,
+                )
+            logger.info("─" * 60)
+            # ──────────────────────────────────────────────────────────────
 
             payload = {
                 "text": sentence,
@@ -113,12 +144,18 @@ async def websocket_live_speech(websocket: WebSocket):
 
     except WebSocketDisconnect:
         # Client disconnected cleanly
-        pass
+        logger.info(
+            "WebSocket connection closed (clean)",
+            extra={"client": client, "total_sentences": sentence_idx},
+        )
     except Exception as e:
+        logger.error(
+            "WebSocket connection closed (error)",
+            extra={"client": client, "exception": str(e), "total_sentences": sentence_idx},
+        )
         logger.exception("❌ [ws] Uncaught websocket error:")
         try:
             await websocket.send_json({"error": f"Internal server error: {str(e)}"})
             await websocket.close()
         except Exception:
             pass
-

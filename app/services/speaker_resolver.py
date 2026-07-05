@@ -40,7 +40,7 @@ async def resolve_speaker_from_metadata(
     cache_key = hashlib.sha256(text_to_hash.encode("utf-8")).hexdigest()
 
     if cache_key in _speaker_cache:
-        logger.info(f"Speaker cache hit for '{title}' (Key: {cache_key})")
+        logger.info(f"Speaker cache hit for '{title}' (Key: {cache_key})", extra={"cache_size": len(_speaker_cache)})
         logger.debug(f"Cached resolution: {_speaker_cache[cache_key]}")
         return _speaker_cache[cache_key]
 
@@ -67,17 +67,21 @@ Example output:
         logger.info("Calling LLM Gateway for speaker resolution...")
         logger.debug(f"Speaker prompt sent to LLM:\n{prompt}")
         
+        import time
+        start_time = time.time()
         response = await acreate_structured_output_with_rotation(
             text_input=prompt,
             system_prompt="You are an expert at extracting speaker names from video metadata. Always output valid JSON matching the requested structure.",
             response_model=SpeakerResolutionResponse,
         )
+        latency_ms = int((time.time() - start_time) * 1000)
 
-        logger.info("Successfully received structured output from LLM for speaker resolution.")
+        logger.info("Successfully received structured output from LLM for speaker resolution.", extra={"latency_ms": latency_ms})
         logger.debug(f"Raw LLM parsed response: {response.model_dump()}")
 
         confidence = response.confidence
         if confidence not in ["high", "medium", "low"]:
+            logger.warning("Confidence invalid - defaulting to low", extra={"raw_confidence": confidence})
             confidence = "low"
 
         matched_politician = response.primary_speaker in existing_politicians
@@ -90,9 +94,10 @@ Example output:
         )
 
         logger.info(f"Speaker resolved to: '{resolution.name}' (Confidence: {resolution.confidence})")
-        logger.debug(f"Matched against existing politician pool: {resolution.matched_politician}")
+        logger.debug("Matched politician result", extra={"speaker_name": resolution.name, "matched": matched_politician, "pool_size": len(existing_politicians)})
 
         _speaker_cache[cache_key] = resolution
+        logger.debug("Cache write", extra={"cache_key": cache_key, "cache_size": len(_speaker_cache)})
         return resolution
 
     except Exception as e:

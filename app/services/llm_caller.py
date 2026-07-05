@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import time
 from typing import TypeVar, Type
 
 import os
@@ -26,13 +27,18 @@ async def acreate_structured_output_with_rotation(
     Wrapper around litellm+instructor that adds multi-key 
     rotation and rate-limit handling.
     """
+    attempt = 0
     try:
         model = os.getenv("LLM_MODEL", "gemini/gemini-3.5-flash")
         while True:
+            attempt += 1
             key = await llm_key_pool.next_key()
+            key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
             try:
+                logger.info("LLM call started", extra={"model": model, "key_preview": key_preview, "response_model": response_model.__name__, "attempt": attempt})
+                start_time = time.time()
                 # We use litellm/instructor directly so we can inject the key per-call.
-                return await _aclient.chat.completions.create(
+                response = await _aclient.chat.completions.create(
                     model=model,
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -42,24 +48,29 @@ async def acreate_structured_output_with_rotation(
                     api_key=key,
                     max_retries=0, # Let our key pool loop handle the retries
                 )
+                latency_ms = int((time.time() - start_time) * 1000)
+                logger.info("LLM call succeeded", extra={"model": model, "latency_ms": latency_ms, "attempt": attempt})
+                return response
             except Exception as e:
                 error_msg = str(e)
                 exception_name = e.__class__.__name__
                 if any(keyword in error_msg for keyword in ["InstructorRetryException", "RateLimitError", "RESOURCE_EXHAUSTED", "429"]) or "InstructorRetryException" in exception_name:
                     llm_key_pool.mark_rate_limited(key)
                     remaining = llm_key_pool.available_count()
-                    key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
                     logger.warning(
                         f"[llm] ⚡ Key rotated: {key_preview} rate-limited, "
-                        f"switching ({remaining} keys remaining)"
+                        f"switching ({remaining} keys remaining)",
+                        extra={"key_preview": key_preview, "remaining_keys": remaining, "attempt": attempt, "exception": exception_name}
                     )
                     continue
                 
+                logger.error("LLM call failed", extra={"exception": exception_name, "error_msg": error_msg, "attempt": attempt})
                 # If it's a different exception, re-raise it
                 raise e
     except AllKeysExhaustedError:
         logger.error(
             "[llm] ❌ All API keys exhausted. Pipeline stalled — "
-            "add more keys or wait for cooldown."
+            "add more keys or wait for cooldown.",
+            extra={"stalled_at": time.time()}
         )
         raise

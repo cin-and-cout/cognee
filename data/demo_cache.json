@@ -241,5 +241,89 @@
     },
     "my best friends call me barack.": {
         "pipeline_status": "no_claim"
+    },
+    "we have reduced inflation from 8 percent to 3 percent.": {
+        "new_claim": {
+            "statement": "We have reduced inflation from 8 percent to 3 percent.",
+            "claim_date": "2026-07-05",
+            "is_numeric": true,
+            "value": 3.0,
+            "unit": "%",
+            "metric": "Inflation Rate",
+            "topic": "Inflation"
+        },
+        "historical_claim": null,
+        "verdict": {
+            "label": "No prior record",
+            "explanation": "No prior historical claims found for topic 'Inflation'.",
+            "type": "none"
+        },
+        "pipeline_status": "added_unverified"
+    },
+    "inflation has dropped from 9 percent to 4 percent.": {
+        "new_claim": {
+            "statement": "Inflation has dropped from 9 percent to 4 percent.",
+            "claim_date": "2026-07-05",
+            "is_numeric": true,
+            "value": 4.0,
+            "unit": "%",
+            "metric": "Inflation Rate",
+            "topic": "Inflation"
+        },
+        "historical_claim": null,
+        "verdict": {
+            "label": "No prior record",
+            "explanation": "No prior historical claims found for topic 'Inflation'.",
+            "type": "none"
+        },
+        "pipeline_status": "added_unverified"
+    },
+    "inflation now stands at 9 percent, the highest it has ever been.": {
+        "new_claim": {
+            "statement": "Inflation now stands at 9 percent, the highest it has ever been.",
+            "claim_date": "2026-07-05",
+            "is_numeric": true,
+            "value": 9.0,
+            "unit": "%",
+            "metric": "Inflation Rate",
+            "topic": "Inflation"
+        },
+        "historical_claim": null,
+        "verdict": {
+            "label": "No prior record",
+            "explanation": "No prior historical claims found for topic 'Inflation'.",
+            "type": "none"
+        },
+        "pipeline_status": "added_unverified"
+    },
+    "inflation is at 3 percent, a historic low.": {
+        "pipeline_status": "no_claim"
+    },
+    "inflation has never been higher, we are in a cost of living crisis.": {
+        "pipeline_status": "no_claim"
+    },
+    "we have built 50000 affordable housing units this year.": {
+        "pipeline_status": "no_claim"
+    },
+    "our government has reduced unemployment to just 2.1 percent.": {
+        "new_claim": {
+            "statement": "Our government has reduced unemployment to just 2.1 percent.",
+            "claim_date": "2026-07-05",
+            "is_numeric": true,
+            "value": 2.1,
+            "unit": "%",
+            "metric": "Unemployment Rate",
+            "topic": "Unemployment"
+        },
+        "historical_claim": null,
+        "verdict": {
+            "label": "No prior record",
+            "explanation": "No prior historical claims found for topic 'Unemployment'.",
+            "type": "none"
+        },
+        "pipeline_status": "added_unverified"
+    },
+    "the tax rate for middle class families has been cut from 22 percent to 18 percent.": {
+        "pipeline_status": "no_claim"
     }
 }

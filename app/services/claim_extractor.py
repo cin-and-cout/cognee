@@ -86,6 +86,8 @@ understandable without any prior context or the [Context] block.
 """
 
 
+import time
+
 async def extract_claim_from_text(
     text: str,
     politician_name: str,
@@ -98,33 +100,43 @@ async def extract_claim_from_text(
     Extracts a structured Claim object from a given raw text sentence if a
     checkable claim is present. Returns None if no checkable claim is found.
     """
-    logger.info(f"Extracting claim from text for politician: '{politician_name}'")
+    word_count = len(text.split())
+    logger.info(f"Extracting claim from text for politician: '{politician_name}'", extra={"politician_name": politician_name, "claim_date": claim_date, "word_count": word_count})
     logger.debug(f"Text snippet: {text[:100]}...")
     
     try:
         context_prefix = ""
+        injected = False
+        entity_count = 0
         if has_references(text):
             if speech_context and not speech_context.is_empty():
                 context_prefix = speech_context.to_context_string() + "\n"
+                injected = True
+                entity_count = len(speech_context.entities)
             elif sentence_history:
                 context_prefix = " ".join(list(sentence_history)[-2:]) + "\n"
+                injected = True
+        logger.debug("Coreference injection check", extra={"injected": injected, "entity_count": entity_count})
 
         text_for_llm = context_prefix + text
 
-        logger.info("Calling LLM Gateway for claim extraction...")
+        logger.info("Calling LLM Gateway for claim extraction...", extra={"text_chars": len(text_for_llm)})
         logger.debug(f"System Prompt:\n{SYSTEM_PROMPT.strip()}\nText Input:\n{text_for_llm}")
         
+        start_time = time.time()
         extracted: ExtractedClaimModel = await acreate_structured_output_with_rotation(
             text_input=text_for_llm,
             system_prompt=SYSTEM_PROMPT.strip(),
             response_model=ExtractedClaimModel,
         )
+        latency_ms = int((time.time() - start_time) * 1000)
 
-        logger.info(f"Received claim extraction output. Has claim: {extracted.has_claim}")
+        logger.info(f"Received claim extraction output. Has claim: {extracted.has_claim}", extra={"has_claim": extracted.has_claim, "topic": extracted.topic, "is_numeric": extracted.is_numeric, "latency_ms": latency_ms})
         logger.debug(f"Raw extracted claim data: {extracted.model_dump()}")
 
         if not extracted.has_claim or not extracted.topic or not extracted.statement:
-            logger.info("No actionable claim found in the text.")
+            reason = "has_claim=False" if not extracted.has_claim else "missing topic or statement"
+            logger.info("No actionable claim found in the text.", extra={"reason": reason})
             return None
 
         # Instantiate the custom Datapoint models
@@ -152,6 +164,9 @@ async def extract_claim_from_text(
         # Explicitly link relations for Cognee representation
         claim_node.politician = politician_node
         claim_node.topic = topic_node
+
+        snippet = extracted.statement[:80] + "..." if len(extracted.statement) > 80 else extracted.statement
+        logger.info("Claim object constructed", extra={"statement_snippet": snippet, "topic": extracted.topic, "is_numeric": extracted.is_numeric, "value": extracted.value, "unit": extracted.unit})
 
         return claim_node
 
