@@ -29,7 +29,6 @@ async def acreate_structured_output_with_rotation(
                     text_input=text_input,
                     system_prompt=system_prompt,
                     response_model=response_model,
-                    api_key=key
                 )
             except Exception as e:
                 error_msg = str(e)
