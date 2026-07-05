@@ -45,18 +45,14 @@ async def acreate_structured_output_with_rotation(
             except Exception as e:
                 error_msg = str(e)
                 exception_name = e.__class__.__name__
-                if any(keyword in error_msg for keyword in ["InstructorRetryException", "RateLimitError", "RESOURCE_EXHAUSTED", "429"]) or "InstructorRetryException" in exception_name:
-                    llm_key_pool.mark_rate_limited(key)
-                    remaining = llm_key_pool.available_count()
-                    key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
-                    logger.warning(
-                        f"[llm] ⚡ Key rotated: {key_preview} rate-limited, "
-                        f"switching ({remaining} keys remaining)"
-                    )
-                    continue
-                
-                # If it's a different exception, re-raise it
-                raise e
+                llm_key_pool.mark_rate_limited(key)
+                remaining = llm_key_pool.available_count()
+                key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
+                logger.warning(
+                    f"[llm] ⚡ Key {key_preview} marked rate-limited/unusable due to error ({exception_name}). "
+                    f"Switching ({remaining} keys remaining)"
+                )
+                continue
     except AllKeysExhaustedError:
         logger.error(
             "[llm] ❌ All API keys exhausted. Pipeline stalled — "
