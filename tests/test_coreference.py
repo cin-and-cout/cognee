@@ -8,7 +8,7 @@ def test_has_references_pronouns():
     assert has_references("His plan is good.") is True
     assert has_references("Her idea was brilliant.") is True
 
-def demonstratives_and_phrases():
+def test_demonstratives_and_phrases():
     assert has_references("This will be great.") is True
     assert has_references("That figure is wrong.") is True
     assert has_references("The plan was announced.") is True
