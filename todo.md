@@ -350,3 +350,68 @@ If you are picking up this project, please follow these instructions:
     - [ ] **13.5.e** Add `OCR_ENABLED: bool` env flag (default `false`) so this feature is opt-in. Register `app/api/ocr.py` router in `app/main.py` only when `OCR_ENABLED=true`.
   - **Verification:** With `OCR_ENABLED=true`, open a CNN YouTube live stream with visible lower-third name graphics. Confirm `currentSpeaker` updates in `background.js` console within 3–6 seconds of a new speaker appearing. Confirm the updated speaker name propagates to the WebSocket payload and appears on the next verdict card.
 
+---
+
+### Milestone 14: Multi-API Key Rotation with Rate-Limit Fallback (Should Have)
+
+> **Goal:** Eliminate pipeline freezes caused by a single API key hitting its rate limit. Replace the current single-key retry loop with a key pool that immediately falls over to a healthy key on HTTP 429, with per-key cooldown tracking.
+
+- [ ] **[Task 14.1] LLM Key Pool**
+  - **Focus:** Infrastructure / LLM
+  - **Branch:** `feature/14.1-llm-key-pool`
+  - **Description:** Create `app/services/key_pool.py` with an `LLMKeyPool` class. The pool reads comma-separated API keys from env vars (e.g., `GEMINI_API_KEYS=key1,key2,key3`). `next_key()` round-robins across all keys, skipping any that are currently in a cooldown window. `mark_rate_limited(key)` stamps a key with the current timestamp and evicts it from rotation for `cooldown_duration` seconds (default 60s). `available_count()` returns the number of non-cooling keys. The class must be async-safe (use `asyncio.Lock` for concurrent calls).
+  - **Sub-tasks:**
+    - [ ] **14.1.a** Create `app/services/key_pool.py`. Implement `LLMKeyPool(keys: list[str], cooldown_duration: int = 60)` with internal `_cooldowns: dict[str, float]` tracking. `next_key()` iterates the list in round-robin order, skips keys whose `time.time() - _cooldowns[key] < cooldown_duration`, and raises `AllKeysExhaustedError` if none are available.
+    - [ ] **14.1.b** Define `AllKeysExhaustedError(Exception)` in the same file. This is raised when every key in the pool is currently on cooldown — the caller should surface this as a pipeline stall with a clear log message rather than a silent retry.
+    - [ ] **14.1.c** Add `available_count() -> int` and `cooldown_status() -> dict[str, float]` methods for observability (used in health-check endpoint and logs).
+    - [ ] **14.1.d** Update `app/env_init.py` to parse `GEMINI_API_KEYS`, `OPENAI_API_KEYS`, and `GROQ_API_KEYS` env vars as comma-separated lists. Update `.env.template` to document the multi-key format with a comment explaining the rotation behaviour.
+    - [ ] **14.1.e** Write `tests/test_key_pool.py` covering: (i) round-robin ordering across N keys, (ii) rate-limited key is skipped and next is returned, (iii) all keys rate-limited raises `AllKeysExhaustedError`, (iv) key recovers after `cooldown_duration` elapses (mock `time.time`).
+  - **Verification:** `pytest tests/test_key_pool.py` passes. Manually set `GEMINI_API_KEYS=bad_key,real_key` — confirm the pool skips `bad_key` after its first 429 and uses `real_key` for all subsequent calls without any pipeline stall.
+
+- [ ] **[Task 14.2] LLM Gateway Wrapper with Key Rotation**
+  - **Focus:** Infrastructure / LLM
+  - **Branch:** `feature/14.2-gateway-key-wrapper`
+  - **Description:** Create a thin wrapper around `LLMGateway.acreate_structured_output()` that pulls the next available key from the pool before each call, injects it, catches `RateLimitError` / HTTP 429 exceptions, marks the key as cooling, and immediately retries with the next available key — without any sleep on the same key. Existing callers (`claim_extractor.py`, `speaker_resolver.py`) route through the wrapper with no interface change.
+  - **Sub-tasks:**
+    - [ ] **14.2.a** Audit how `LLMGateway.acreate_structured_output()` resolves its API key (env var vs constructor arg). If it supports a per-call `api_key` kwarg (via `litellm` underneath), use that. If not, use `litellm.acompletion()` directly with `api_key=key` for the rotating calls and keep `LLMGateway` only for non-key-sensitive operations.
+    - [ ] **14.2.b** Create `app/services/llm_caller.py`. Implement `async def acreate_structured_output_with_rotation(text_input, system_prompt, response_model) -> T`. Loop: get `key = pool.next_key()` → call LLM with that key → on `RateLimitError` call `pool.mark_rate_limited(key)` and continue loop → on `AllKeysExhaustedError` log a clear error and re-raise → on success return result.
+    - [ ] **14.2.c** Update `app/services/claim_extractor.py` to import and call `acreate_structured_output_with_rotation` instead of `LLMGateway.acreate_structured_output` directly. No other interface changes.
+    - [ ] **14.2.d** Update `app/services/speaker_resolver.py` with the same substitution as 14.2.c.
+    - [ ] **14.2.e** Add structured log lines: on key switch log `[llm] ⚡ Key rotated: key_xxx rate-limited, switching to key_yyy (N keys remaining)`. On `AllKeysExhaustedError` log `[llm] ❌ All API keys exhausted. Pipeline stalled — add more keys or wait for cooldown.`
+  - **Verification:** Mock the LLM client to return HTTP 429 for key1 and a valid response for key2. Confirm `llm_caller.py` completes the call successfully using key2 with zero sleep delay. Confirm the correct log lines appear. Run `pytest` with no regressions on existing tests.
+
+---
+
+### Milestone 15: Cross-Sentence Coreference Resolution (Must Have)
+
+> **Goal:** Ensure every stored `Claim.statement` is a fully self-contained sentence where all pronouns and indirect references are resolved to their concrete antecedents. Uses a 3-phase gate to avoid wasting tokens on sentences that need no context.
+>
+> **Strategy:** Phase 1 — cheap regex gates out self-contained sentences (zero LLM cost). Phase 2 — a compact rolling `SpeechContext` entity state (updated every sentence, covers the whole session) is injected only when references are detected. Phase 3 — fallback to last 2 raw sentences for rare ambiguous cases.
+
+- [ ] **[Task 15.1] Reference Detector & SpeechContext Tracker**
+  - **Focus:** Backend / Services
+  - **Branch:** `feature/15.1-reference-detector`
+  - **Description:** Create `app/services/coreference.py` containing two components: (A) a `has_references(sentence)` function that uses regex to detect pronouns, demonstratives, and anaphoric phrases without any LLM call; and (B) a `SpeechContext` dataclass that maintains a compact, rolling entity state across an entire speech session.
+  - **Sub-tasks:**
+    - [ ] **15.1.a** Create `app/services/coreference.py`. Implement `has_references(sentence: str) -> bool` using a compiled regex pattern covering: personal pronouns (`he, she, they, it, his, her, their, its, him, them`), demonstratives (`this, that, these, those`), and anaphoric phrases (`that figure`, `the plan`, `the initiative`, `the policy`, `as mentioned`, `as I said`, `the same`, `the former`, `the latter`). Return `True` only if a match is found as a whole word (word-boundary anchored). This function must have zero external dependencies and run in < 1ms.
+    - [ ] **15.1.b** Implement `SpeechContext` dataclass with fields: `entities: list[Entity]` (where `Entity` has `name: str`, `type: Literal["person", "policy", "metric", "organization"]`, `gender: Optional[Literal["male", "female", "neutral"]]`, `last_seen_idx: int`) and `session_sentence_count: int`. Cap `entities` at 20 most-recently-seen entries (evict by `last_seen_idx`).
+    - [ ] **15.1.c** Implement `SpeechContext.update(sentence: str, sentence_idx: int)` — a lightweight heuristic that scans the sentence for: capitalized named entities (regex: `[A-Z][a-z]+ (?:[A-Z][a-z]+ )*` for people/orgs), numeric claims (regex: `\d+\.?\d*\s*(?:%|billion|million|thousand|units)`), and policy keywords (`initiative`, `plan`, `policy`, `bill`, `act`, `program`). Upserts to `entities` list with the correct type. Does NOT call an LLM.
+    - [ ] **15.1.d** Implement `SpeechContext.to_context_string() -> str` — renders the entity list as a compact one-line string: `"[Context: {name} ({type}{, gender}), ...]"`. Target: ≤ 80 tokens for a 20-entity state. This is what gets injected into the LLM prompt.
+    - [ ] **15.1.e** Write `tests/test_coreference.py` covering: (i) `has_references` returns `True` for sentences with "he", "this plan", "that figure", and `False` for self-contained factual claims; (ii) `SpeechContext.update()` correctly extracts named persons, numeric metrics, and policy keywords; (iii) `to_context_string()` output is under 80 tokens for a 20-entity state.
+  - **Verification:** `pytest tests/test_coreference.py` passes. Feed 20 speech sentences to `SpeechContext.update()` and log the entity state. Confirm named politicians, policies, and numeric metrics all appear in `to_context_string()` output.
+
+- [ ] **[Task 15.2] 3-Phase Context Injection in Claim Extractor**
+  - **Focus:** Backend / Services + API
+  - **Branch:** `feature/15.2-context-injection`
+  - **Description:** Wire the 3-phase gate into the claim extraction pipeline. Phase 1 gates on `has_references()`. Phase 2 injects `SpeechContext.to_context_string()`. Phase 3 falls back to the last 2 raw sentences from the `sentence_history` buffer. Update the LLM system prompt to instruct full pronoun resolution before extraction.
+  - **Sub-tasks:**
+    - [ ] **15.2.a** Update `app/api/websocket.py` to maintain a per-connection `sentence_history: deque[str]` (maxlen=5) that appends each accepted sentence after it passes the dedup/length filters. Pass `sentence_history` to `process_incoming_sentence()`. Also instantiate a per-connection `SpeechContext` object and pass it along.
+    - [ ] **15.2.b** Update `process_incoming_sentence()` in `app/services/orchestrator.py` to accept `sentence_history: deque[str]` and `speech_context: SpeechContext`. Forward both to `extract_claim_from_text()`. After `extract_claim_from_text()` returns, call `speech_context.update(text, sentence_idx)` to keep the entity state current regardless of whether a claim was found.
+    - [ ] **15.2.c** Update `extract_claim_from_text()` in `app/services/claim_extractor.py` to implement the 3-phase gate:
+      - **Phase 1:** Call `has_references(text)`. If `False`, set `context_prefix = ""` (skip phases 2 and 3 entirely).
+      - **Phase 2:** If `True`, call `speech_context.to_context_string()`. If entity state is non-empty, set `context_prefix = context_string`.
+      - **Phase 3:** If entity state is empty (early in session), set `context_prefix = " ".join(list(sentence_history)[-2:])`.
+    - [ ] **15.2.d** Update `SYSTEM_PROMPT` in `claim_extractor.py` to add a coreference resolution instruction block: *"If the sentence contains unresolved pronouns or indirect references (e.g., 'he', 'this plan', 'that figure'), use the provided context to substitute the concrete referent before extracting the statement. The extracted `statement` field MUST be a fully self-contained sentence that can be understood without any prior context."*
+    - [ ] **15.2.e** Add an optional `raw_sentence: Optional[str] = None` field to the `Claim` schema in `app/schemas.py` to preserve the original unresolved sentence alongside the resolved `statement` for debugging. Populate it in `extract_claim_from_text()` when `context_prefix != ""`.
+  - **Verification:** Feed the pipeline a 3-sentence speech sequence where sentence 3 uses "she" referring to a politician named in sentence 1. Confirm: `has_references()` returns `True` for sentence 3, entity state contains the politician, the stored `Claim.statement` contains the politician's name (not "she"), and `Claim.raw_sentence` contains the original "she" sentence. Confirm sentence 1 (self-contained) has empty `context_prefix` and `raw_sentence=None`.
+
