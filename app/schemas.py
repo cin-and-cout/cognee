@@ -46,6 +46,7 @@ class Claim(DataPoint):
     source_link: Optional[str] = None
     speaker_confidence: str = "low"
     source_type: Literal["historical", "live"] = "historical"
+    raw_sentence: Optional[str] = None
 
     # Quantitative fields for numeric drift comparison
     is_numeric: bool = False

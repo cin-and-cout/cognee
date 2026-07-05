@@ -1,11 +1,14 @@
-import logging
+from collections import deque
 from typing import Optional
+
+from app.services.coreference import SpeechContext, has_references
 
 from cognee.infrastructure.llm.LLMGateway import LLMGateway
 from pydantic import BaseModel, Field
 
 from app.schemas import Claim, Politician, Topic
 
+import logging
 logger = logging.getLogger(__name__)
 
 
@@ -74,6 +77,12 @@ Identify if the sentence contains a checkable claim. If it does:
 2. Extract the exact statement.
 3. Determine if it is a numeric claim (contains a specific stat, count, rate, or dollar amount).
 4. If it is numeric, extract the metric, the float value, and the unit.
+
+If the sentence contains unresolved pronouns or indirect references
+(e.g., "he", "she", "this plan", "that figure"), use the [Context] block
+above to substitute the concrete referent before extracting the statement.
+The extracted `statement` field MUST be fully self-contained — it must be
+understandable without any prior context or the [Context] block.
 """
 
 
@@ -82,6 +91,8 @@ async def extract_claim_from_text(
     politician_name: str,
     claim_date: str,
     politician_party: Optional[str] = None,
+    sentence_history: Optional[deque] = None,
+    speech_context: Optional[SpeechContext] = None,
 ) -> Optional[Claim]:
     """
     Extracts a structured Claim object from a given raw text sentence if a
@@ -91,11 +102,20 @@ async def extract_claim_from_text(
     logger.debug(f"Text snippet: {text[:100]}...")
     
     try:
+        context_prefix = ""
+        if has_references(text):
+            if speech_context and not speech_context.is_empty():
+                context_prefix = speech_context.to_context_string() + "\n"
+            elif sentence_history:
+                context_prefix = " ".join(list(sentence_history)[-2:]) + "\n"
+
+        text_for_llm = context_prefix + text
+
         logger.info("Calling LLM Gateway for claim extraction...")
-        logger.debug(f"System Prompt:\n{SYSTEM_PROMPT.strip()}\nText Input:\n{text}")
+        logger.debug(f"System Prompt:\n{SYSTEM_PROMPT.strip()}\nText Input:\n{text_for_llm}")
         
         extracted: ExtractedClaimModel = await LLMGateway.acreate_structured_output(
-            text_input=text,
+            text_input=text_for_llm,
             system_prompt=SYSTEM_PROMPT.strip(),
             response_model=ExtractedClaimModel,
         )
@@ -126,6 +146,7 @@ async def extract_claim_from_text(
             metric=extracted.metric,
             value=extracted.value,
             unit=extracted.unit,
+            raw_sentence=text if context_prefix else None,
         )
 
         # Explicitly link relations for Cognee representation

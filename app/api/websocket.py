@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.services.orchestrator import process_incoming_sentence
+from app.services.coreference import SpeechContext
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,11 @@ async def websocket_live_speech(websocket: WebSocket):
 
     # Per-connection deduplication window
     recent_hashes: deque[str] = deque(maxlen=DEDUP_WINDOW_SIZE)
+    
+    # Per-connection coreference state
+    sentence_history: deque[str] = deque(maxlen=5)
+    speech_context = SpeechContext()
+    sentence_idx = 0
 
     try:
         while True:
@@ -63,6 +69,10 @@ async def websocket_live_speech(websocket: WebSocket):
 
             # Process the incoming live sentence
             logger.info("📥 [ws] Received sentence (%d words): %s", word_count, sentence)
+            
+            sentence_history.append(sentence)
+            sentence_idx += 1
+            
             report = None
             try:
                 report = await process_incoming_sentence(
@@ -71,6 +81,9 @@ async def websocket_live_speech(websocket: WebSocket):
                     claim_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                     politician_party="Progressive Coalition", # We can look this up in the future
                     speaker_confidence=speaker_confidence,
+                    sentence_history=sentence_history,
+                    speech_context=speech_context,
+                    sentence_idx=sentence_idx,
                 )
                 if report and report.get("pipeline_status") != "no_claim":
                     logger.info(

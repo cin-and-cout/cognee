@@ -1,6 +1,9 @@
 import asyncio
 import logging
+from collections import deque
 from typing import Any, Dict, Optional
+
+from app.services.coreference import SpeechContext
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +23,9 @@ async def process_incoming_sentence(
     claim_date: str,
     politician_party: Optional[str] = None,
     speaker_confidence: str = "low",
+    sentence_history: Optional[deque] = None,
+    speech_context: Optional[SpeechContext] = None,
+    sentence_idx: int = 0,
 ) -> Dict[str, Any]:
     """
     Orchestrates the entire claim consistency pipeline for a single speech sentence:
@@ -44,7 +50,13 @@ async def process_incoming_sentence(
         politician_name,
         claim_date,
         politician_party,
+        sentence_history=sentence_history,
+        speech_context=speech_context,
     )
+    
+    # Always update context, even if no claim found
+    if speech_context is not None:
+        speech_context.update(text, sentence_idx)
     if new_claim:
         new_claim.speaker_confidence = speaker_confidence
         new_claim.source_type = "live"
