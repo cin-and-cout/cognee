@@ -7,7 +7,7 @@ from app.services.claim_extractor import ExtractedClaimModel, extract_claim_from
 
 
 @pytest.mark.asyncio
-@patch("app.services.claim_extractor.LLMGateway.acreate_structured_output", new_callable=AsyncMock)
+@patch("app.services.claim_extractor.acreate_structured_output_with_rotation", new_callable=AsyncMock)
 async def test_extract_claim_numeric_success(mock_gateway):
     """
     Verifies that a numeric claim is correctly parsed, instantiates all DataPoint
@@ -52,7 +52,7 @@ async def test_extract_claim_numeric_success(mock_gateway):
 
 
 @pytest.mark.asyncio
-@patch("app.services.claim_extractor.LLMGateway.acreate_structured_output", new_callable=AsyncMock)
+@patch("app.services.claim_extractor.acreate_structured_output_with_rotation", new_callable=AsyncMock)
 async def test_extract_claim_non_numeric_success(mock_gateway):
     """
     Verifies that a qualitative policy commitment is successfully parsed as a non-numeric claim.
@@ -85,7 +85,7 @@ async def test_extract_claim_non_numeric_success(mock_gateway):
 
 
 @pytest.mark.asyncio
-@patch("app.services.claim_extractor.LLMGateway.acreate_structured_output", new_callable=AsyncMock)
+@patch("app.services.claim_extractor.acreate_structured_output_with_rotation", new_callable=AsyncMock)
 async def test_extract_claim_not_a_claim(mock_gateway):
     """
     Verifies that if the text is not a checkable claim, the service returns None.

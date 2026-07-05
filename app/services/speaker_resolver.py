@@ -5,8 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from cognee.infrastructure.llm.LLMGateway import LLMGateway
-
+from app.services.llm_caller import acreate_structured_output_with_rotation
 logger = logging.getLogger(__name__)
 
 
@@ -65,11 +64,10 @@ Example output:
 """
 
     try:
-        llm_client = LLMGateway()
         logger.info("Calling LLM Gateway for speaker resolution...")
         logger.debug(f"Speaker prompt sent to LLM:\n{prompt}")
         
-        response = await llm_client.acreate_structured_output(
+        response = await acreate_structured_output_with_rotation(
             text_input=prompt,
             system_prompt="You are an expert at extracting speaker names from video metadata. Always output valid JSON matching the requested structure.",
             response_model=SpeakerResolutionResponse,

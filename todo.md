@@ -356,28 +356,28 @@ If you are picking up this project, please follow these instructions:
 
 > **Goal:** Eliminate pipeline freezes caused by a single API key hitting its rate limit. Replace the current single-key retry loop with a key pool that immediately falls over to a healthy key on HTTP 429, with per-key cooldown tracking.
 
-- [ ] **[Task 14.1] LLM Key Pool**
+- [x] **[Task 14.1] LLM Key Pool**
   - **Focus:** Infrastructure / LLM
   - **Branch:** `feature/14.1-llm-key-pool`
   - **Description:** Create `app/services/key_pool.py` with an `LLMKeyPool` class. The pool reads comma-separated API keys from env vars (e.g., `GEMINI_API_KEYS=key1,key2,key3`). `next_key()` round-robins across all keys, skipping any that are currently in a cooldown window. `mark_rate_limited(key)` stamps a key with the current timestamp and evicts it from rotation for `cooldown_duration` seconds (default 60s). `available_count()` returns the number of non-cooling keys. The class must be async-safe (use `asyncio.Lock` for concurrent calls).
   - **Sub-tasks:**
-    - [ ] **14.1.a** Create `app/services/key_pool.py`. Implement `LLMKeyPool(keys: list[str], cooldown_duration: int = 60)` with internal `_cooldowns: dict[str, float]` tracking. `next_key()` iterates the list in round-robin order, skips keys whose `time.time() - _cooldowns[key] < cooldown_duration`, and raises `AllKeysExhaustedError` if none are available.
-    - [ ] **14.1.b** Define `AllKeysExhaustedError(Exception)` in the same file. This is raised when every key in the pool is currently on cooldown — the caller should surface this as a pipeline stall with a clear log message rather than a silent retry.
-    - [ ] **14.1.c** Add `available_count() -> int` and `cooldown_status() -> dict[str, float]` methods for observability (used in health-check endpoint and logs).
-    - [ ] **14.1.d** Update `app/env_init.py` to parse `GEMINI_API_KEYS`, `OPENAI_API_KEYS`, and `GROQ_API_KEYS` env vars as comma-separated lists. Update `.env.template` to document the multi-key format with a comment explaining the rotation behaviour.
-    - [ ] **14.1.e** Write `tests/test_key_pool.py` covering: (i) round-robin ordering across N keys, (ii) rate-limited key is skipped and next is returned, (iii) all keys rate-limited raises `AllKeysExhaustedError`, (iv) key recovers after `cooldown_duration` elapses (mock `time.time`).
+    - [x] **14.1.a** Create `app/services/key_pool.py`. Implement `LLMKeyPool(keys: list[str], cooldown_duration: int = 60)` with internal `_cooldowns: dict[str, float]` tracking. `next_key()` iterates the list in round-robin order, skips keys whose `time.time() - _cooldowns[key] < cooldown_duration`, and raises `AllKeysExhaustedError` if none are available.
+    - [x] **14.1.b** Define `AllKeysExhaustedError(Exception)` in the same file. This is raised when every key in the pool is currently on cooldown — the caller should surface this as a pipeline stall with a clear log message rather than a silent retry.
+    - [x] **14.1.c** Add `available_count() -> int` and `cooldown_status() -> dict[str, float]` methods for observability (used in health-check endpoint and logs).
+    - [x] **14.1.d** Update `app/env_init.py` to parse `GEMINI_API_KEYS`, `OPENAI_API_KEYS`, and `GROQ_API_KEYS` env vars as comma-separated lists. Update `.env.template` to document the multi-key format with a comment explaining the rotation behaviour.
+    - [x] **14.1.e** Write `tests/test_key_pool.py` covering: (i) round-robin ordering across N keys, (ii) rate-limited key is skipped and next is returned, (iii) all keys rate-limited raises `AllKeysExhaustedError`, (iv) key recovers after `cooldown_duration` elapses (mock `time.time`).
   - **Verification:** `pytest tests/test_key_pool.py` passes. Manually set `GEMINI_API_KEYS=bad_key,real_key` — confirm the pool skips `bad_key` after its first 429 and uses `real_key` for all subsequent calls without any pipeline stall.
 
-- [ ] **[Task 14.2] LLM Gateway Wrapper with Key Rotation**
+- [x] **[Task 14.2] LLM Gateway Wrapper with Key Rotation**
   - **Focus:** Infrastructure / LLM
   - **Branch:** `feature/14.2-gateway-key-wrapper`
   - **Description:** Create a thin wrapper around `LLMGateway.acreate_structured_output()` that pulls the next available key from the pool before each call, injects it, catches `RateLimitError` / HTTP 429 exceptions, marks the key as cooling, and immediately retries with the next available key — without any sleep on the same key. Existing callers (`claim_extractor.py`, `speaker_resolver.py`) route through the wrapper with no interface change.
   - **Sub-tasks:**
-    - [ ] **14.2.a** Audit how `LLMGateway.acreate_structured_output()` resolves its API key (env var vs constructor arg). If it supports a per-call `api_key` kwarg (via `litellm` underneath), use that. If not, use `litellm.acompletion()` directly with `api_key=key` for the rotating calls and keep `LLMGateway` only for non-key-sensitive operations.
-    - [ ] **14.2.b** Create `app/services/llm_caller.py`. Implement `async def acreate_structured_output_with_rotation(text_input, system_prompt, response_model) -> T`. Loop: get `key = pool.next_key()` → call LLM with that key → on `RateLimitError` call `pool.mark_rate_limited(key)` and continue loop → on `AllKeysExhaustedError` log a clear error and re-raise → on success return result.
-    - [ ] **14.2.c** Update `app/services/claim_extractor.py` to import and call `acreate_structured_output_with_rotation` instead of `LLMGateway.acreate_structured_output` directly. No other interface changes.
-    - [ ] **14.2.d** Update `app/services/speaker_resolver.py` with the same substitution as 14.2.c.
-    - [ ] **14.2.e** Add structured log lines: on key switch log `[llm] ⚡ Key rotated: key_xxx rate-limited, switching to key_yyy (N keys remaining)`. On `AllKeysExhaustedError` log `[llm] ❌ All API keys exhausted. Pipeline stalled — add more keys or wait for cooldown.`
+    - [x] **14.2.a** Audit how `LLMGateway.acreate_structured_output()` resolves its API key (env var vs constructor arg). If it supports a per-call `api_key` kwarg (via `litellm` underneath), use that. If not, use `litellm.acompletion()` directly with `api_key=key` for the rotating calls and keep `LLMGateway` only for non-key-sensitive operations.
+    - [x] **14.2.b** Create `app/services/llm_caller.py`. Implement `async def acreate_structured_output_with_rotation(text_input, system_prompt, response_model) -> T`. Loop: get `key = pool.next_key()` → call LLM with that key → on `RateLimitError` call `pool.mark_rate_limited(key)` and continue loop → on `AllKeysExhaustedError` log a clear error and re-raise → on success return result.
+    - [x] **14.2.c** Update `app/services/claim_extractor.py` to import and call `acreate_structured_output_with_rotation` instead of `LLMGateway.acreate_structured_output` directly. No other interface changes.
+    - [x] **14.2.d** Update `app/services/speaker_resolver.py` with the same substitution as 14.2.c.
+    - [x] **14.2.e** Add structured log lines: on key switch log `[llm] ⚡ Key rotated: key_xxx rate-limited, switching to key_yyy (N keys remaining)`. On `AllKeysExhaustedError` log `[llm] ❌ All API keys exhausted. Pipeline stalled — add more keys or wait for cooldown.`
   - **Verification:** Mock the LLM client to return HTTP 429 for key1 and a valid response for key2. Confirm `llm_caller.py` completes the call successfully using key2 with zero sleep delay. Confirm the correct log lines appear. Run `pytest` with no regressions on existing tests.
 
 ---

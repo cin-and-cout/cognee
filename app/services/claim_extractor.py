@@ -3,7 +3,7 @@ from typing import Optional
 
 from app.services.coreference import SpeechContext, has_references
 
-from cognee.infrastructure.llm.LLMGateway import LLMGateway
+from app.services.llm_caller import acreate_structured_output_with_rotation
 from pydantic import BaseModel, Field
 
 from app.schemas import Claim, Politician, Topic
@@ -114,7 +114,7 @@ async def extract_claim_from_text(
         logger.info("Calling LLM Gateway for claim extraction...")
         logger.debug(f"System Prompt:\n{SYSTEM_PROMPT.strip()}\nText Input:\n{text_for_llm}")
         
-        extracted: ExtractedClaimModel = await LLMGateway.acreate_structured_output(
+        extracted: ExtractedClaimModel = await acreate_structured_output_with_rotation(
             text_input=text_for_llm,
             system_prompt=SYSTEM_PROMPT.strip(),
             response_model=ExtractedClaimModel,
