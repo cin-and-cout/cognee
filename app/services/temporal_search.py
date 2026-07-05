@@ -1,7 +1,7 @@
 from datetime import datetime
 import time
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 from cognee.infrastructure.databases.graph import get_graph_engine
@@ -9,6 +9,16 @@ from cognee.infrastructure.databases.graph import get_graph_engine
 from app.schemas import Claim, Politician, Topic
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Module-level TTL cache for the full graph dump.
+# Fetching all nodes+edges is O(n) and blocks the event loop; caching for
+# a short window eliminates redundant dumps during rapid speech bursts while
+# still reflecting newly-ingested claims within a few seconds.
+# ---------------------------------------------------------------------------
+_graph_cache: Optional[Tuple] = None  # (nodes, edges)
+_graph_cache_ts: float = 0.0
+_GRAPH_CACHE_TTL: float = 3.0  # seconds
 
 
 async def get_historical_claims(
@@ -23,12 +33,29 @@ async def get_historical_claims(
     """
     logger.info("get_historical_claims called", extra={"topic_name": topic_name, "politician_name": politician_name})
     
+    global _graph_cache, _graph_cache_ts
     start_time = time.time()
-    graph_engine = await get_graph_engine()
-    logger.debug("Graph engine acquired", extra={"engine_type": type(graph_engine).__name__})
-    nodes, edges = await graph_engine.get_graph_data()
-    latency_ms = int((time.time() - start_time) * 1000)
-    logger.debug("Graph data fetched", extra={"node_count": len(nodes), "edge_count": len(edges), "latency_ms": latency_ms})
+    now = start_time
+
+    if _graph_cache is not None and (now - _graph_cache_ts) < _GRAPH_CACHE_TTL:
+        nodes, edges = _graph_cache
+        logger.debug(
+            "Graph cache HIT (%.2fs old, TTL %.1fs)",
+            now - _graph_cache_ts,
+            _GRAPH_CACHE_TTL,
+        )
+    else:
+        graph_engine = await get_graph_engine()
+        logger.debug("Graph engine acquired", extra={"engine_type": type(graph_engine).__name__})
+        nodes, edges = await graph_engine.get_graph_data()
+        _graph_cache = (nodes, edges)
+        _graph_cache_ts = time.time()
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.debug(
+            "Graph cache MISS — fetched and cached  (%dms)",
+            latency_ms,
+            extra={"node_count": len(nodes), "edge_count": len(edges)},
+        )
 
     # Create a mapping of string IDs to node properties for fast lookup
     node_map = {str(node_id): props for node_id, props in nodes}

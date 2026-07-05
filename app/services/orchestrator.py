@@ -8,6 +8,21 @@ from app.services.coreference import SpeechContext
 
 logger = logging.getLogger(__name__)
 
+
+def _log_ingestion_result(task: asyncio.Task) -> None:
+    """Done-callback for background ingestion tasks. Logs errors without crashing."""
+    try:
+        exc = task.exception()
+        if exc:
+            logger.exception(
+                "   ❌ Background ingestion task failed",
+                exc_info=exc,
+            )
+        else:
+            logger.info("   ✅ Background ingestion task completed successfully")
+    except asyncio.CancelledError:
+        logger.warning("   ⚠️  Background ingestion task was cancelled")
+
 import cognee
 from cognee.tasks.storage import add_data_points
 
@@ -16,6 +31,7 @@ from app.services.claim_extractor import extract_claim_from_text
 from app.services.comparison.nli_classifier import classify_nli_contradiction
 from app.services.comparison.numeric_diff import calculate_numeric_diff
 from app.services.temporal_search import get_historical_claims
+from app.services.key_pool import AllKeysExhaustedError
 
 
 async def process_incoming_sentence(
@@ -48,14 +64,19 @@ async def process_incoming_sentence(
     # ── STAGE 1: Claim Extraction ──────────────────────────────────────────────
     logger.info("── STAGE 1/4: Claim Extraction ──────────────────────────")
     t1 = time.perf_counter()
-    new_claim = await extract_claim_from_text(
-        text,
-        politician_name,
-        claim_date,
-        politician_party,
-        sentence_history=sentence_history,
-        speech_context=speech_context,
-    )
+    try:
+        new_claim = await extract_claim_from_text(
+            text,
+            politician_name,
+            claim_date,
+            politician_party,
+            sentence_history=sentence_history,
+            speech_context=speech_context,
+        )
+    except AllKeysExhaustedError:
+        logger.error("   ❌ Rate limit exhausted — returning rate_limited status")
+        return {"pipeline_status": "rate_limited"}
+
     t1_ms = int((time.perf_counter() - t1) * 1000)
 
     # Always update context, even if no claim found
@@ -137,33 +158,20 @@ async def process_incoming_sentence(
 
     # ── STAGE 4: Ingest ────────────────────────────────────────────────────────
     logger.info("── STAGE 4/4: DB Ingestion ───────────────────────────────")
-    should_persist = speaker_confidence in ("high", "medium")
+    # Always persist claims to db (metadata contains speaker_confidence)
+    should_persist = True
     claim_snippet = new_claim.statement[:80] + "..." if len(new_claim.statement) > 80 else new_claim.statement
 
     async def run_ingestion():
-        try:
-            logger.info("add_data_points called", extra={"types": ["Politician", "Topic", "Claim"]})
-            start_add = time.time()
-            await add_data_points([new_claim.politician, new_claim.topic, new_claim])
-            logger.info("add_data_points succeeded", extra={"latency_ms": int((time.time() - start_add)*1000)})
-
-            logger.debug("cognee.add called", extra={"dataset_name": "default_dataset"})
-            await cognee.add("historical_claims", dataset_name="default_dataset")
-
-            logger.info("cognee.cognify started", extra={"temporal_cognify": True})
-            start_cognify = time.time()
-            await cognee.cognify(temporal_cognify=True)
-            logger.info("cognee.cognify completed", extra={"latency_ms": int((time.time() - start_cognify)*1000)})
-        except Exception as e:
-            logger.exception("Background claim ingestion failed — data point was NOT persisted to the graph", extra={"claim_statement": claim_snippet, "error": str(e)})
+        logger.info("add_data_points called", extra={"types": ["Politician", "Topic", "Claim"]})
+        start_add = time.time()
+        await add_data_points([new_claim.politician, new_claim.topic, new_claim])
+        logger.info("add_data_points succeeded", extra={"latency_ms": int((time.time() - start_add)*1000)})
 
     if should_persist:
+        logger.info("   💾 Dispatching background ingestion (non-blocking)...")
         task = asyncio.create_task(run_ingestion())
-        logger.info(
-            "   💾 Queued background ingestion  (speaker_confidence=%s)",
-            speaker_confidence,
-        )
-        logger.debug("Background ingestion task created", extra={"task_name": task.get_name()})
+        task.add_done_callback(_log_ingestion_result)
         pipeline_status = "compared_added" if latest_historical else "added_unverified"
     else:
         logger.info(
@@ -171,9 +179,6 @@ async def process_incoming_sentence(
             speaker_confidence,
         )
         pipeline_status = "compared_skipped" if latest_historical else "skipped_unverified"
-
-    # Yield control to event loop so background task can start executing
-    await asyncio.sleep(0.001)
 
     # 5. Build and return report
     report = {
@@ -202,7 +207,8 @@ async def process_incoming_sentence(
         "pipeline_status": pipeline_status,
     }
 
-    # Save to cache
-    set_cached_verdict(text, report)
+    # Save to cache (only for successful end states)
+    if pipeline_status not in ("rate_limited", "ingest_timeout", "ingest_error", "error"):
+        set_cached_verdict(text, report)
 
     return report

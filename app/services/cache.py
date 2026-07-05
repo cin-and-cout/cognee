@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import logging
@@ -50,9 +51,23 @@ def get_cached_verdict(text: str) -> Optional[Dict[str, Any]]:
     return res
 
 
+def _write_cache_to_disk() -> None:
+    """Synchronous helper that persists the current in-memory cache to disk.
+    Called via run_in_executor so it never blocks the event loop."""
+    try:
+        os.makedirs(os.path.dirname(CACHE_FILE_PATH), exist_ok=True)
+        with open(CACHE_FILE_PATH, "w", encoding="utf-8") as f:
+            json.dump(_cache, f, indent=4)
+        logger.debug("Cache file save succeeded", extra={"file_path": CACHE_FILE_PATH, "entry_count": len(_cache)})
+    except Exception as e:
+        logger.warning("Cache file save failed", extra={"error": str(e)})
+
+
 def set_cached_verdict(text: str, report: Dict[str, Any]):
     """
-    Stores a report/verdict in the cache and saves it to data/demo_cache.json.
+    Stores a report/verdict in the cache.
+    The in-memory dict is updated immediately; disk persistence is deferred
+    to a thread-pool executor so it does not block the event loop.
     """
     key = text.strip().lower()
     _cache[key] = report
@@ -60,10 +75,8 @@ def set_cached_verdict(text: str, report: Dict[str, Any]):
     logger.debug("Cache write", extra={"key_preview": key_preview, "cache_size": len(_cache)})
 
     try:
-        os.makedirs(os.path.dirname(CACHE_FILE_PATH), exist_ok=True)
-        # We save the cache back with the normalized keys
-        with open(CACHE_FILE_PATH, "w", encoding="utf-8") as f:
-            json.dump(_cache, f, indent=4)
-        logger.debug("Cache file save succeeded", extra={"file_path": CACHE_FILE_PATH, "entry_count": len(_cache)})
-    except Exception as e:
-        logger.warning("Cache file save failed", extra={"error": str(e)})
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, _write_cache_to_disk)
+    except RuntimeError:
+        # No running event loop (e.g. in a test) — fall back to synchronous write
+        _write_cache_to_disk()
