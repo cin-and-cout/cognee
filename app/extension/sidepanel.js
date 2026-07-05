@@ -177,26 +177,35 @@ document.addEventListener("DOMContentLoaded", () => {
     let badgeHtml = "";
 
     if (log.report === null) {
-      // 12.2.c — analyzing state
-      badgeHtml = `<span class="verdict-badge analyzing">⏳ Analyzing…</span>`;
+      // Still waiting for backend response
+      badgeHtml = `<span class="verdict-badge analyzing">⏳ Analysing…</span>`;
     } else if (log.report.pipeline_status === "no_claim") {
-      badgeHtml = `<span class="verdict-badge neutral">⚪ No Claim</span>`;
+      badgeHtml = `<span class="verdict-badge no-claim">✕ Not a Valid Claim</span>`;
     } else if (log.report.pipeline_status === "added_unverified") {
-      badgeHtml = `<span class="verdict-badge unverified">◈ Added to DB</span>`;
+      badgeHtml = `<span class="verdict-badge added">📥 Added to DB</span>`;
     } else if (log.report.pipeline_status === "skipped_unverified") {
-      badgeHtml = `<span class="verdict-badge unverified">◈ Skipped (Low Conf)</span>`;
-    } else if (log.report.pipeline_status === "compared_added" || log.report.pipeline_status === "compared_skipped") {
-      const isConsistent = log.report.verdict?.is_consistent;
+      badgeHtml = `<span class="verdict-badge skipped">⚠ Skipped — Low Confidence</span>`;
+    } else if (log.report.pipeline_status === "error") {
+      badgeHtml = `<span class="verdict-badge error">⚠️ Processing Error</span>`;
+    } else if (
+      log.report.pipeline_status === "compared_added" ||
+      log.report.pipeline_status === "compared_skipped"
+    ) {
+      const saved = log.report.pipeline_status === "compared_added";
       const label = (log.report.verdict?.label || "").toUpperCase();
-      if (isConsistent === false || label.includes("CONTRADICT")) {
-        badgeHtml = `<span class="verdict-badge contradiction">🚨 Contradiction</span>`;
-      } else if (isConsistent === true || label.includes("CONSISTENT")) {
-        badgeHtml = `<span class="verdict-badge consistent">✓ Consistent</span>`;
+      const isContradiction = label.includes("CONTRADICT");
+      const isConsistent    = label.includes("CONSISTENT");
+      const savedSuffix     = saved ? "" : " (Not Saved)";
+
+      if (isContradiction) {
+        badgeHtml = `<span class="verdict-badge contradiction">🚨 Claim Inconsistent${savedSuffix}</span>`;
+      } else if (isConsistent) {
+        badgeHtml = `<span class="verdict-badge consistent">✓ Consistent${savedSuffix}</span>`;
       } else {
-        badgeHtml = `<span class="verdict-badge neutral">— Neutral</span>`;
+        badgeHtml = `<span class="verdict-badge neutral">— No Prior Record${savedSuffix}</span>`;
       }
     } else {
-      badgeHtml = `<span class="verdict-badge neutral">— Unverified</span>`;
+      badgeHtml = `<span class="verdict-badge neutral">— Unknown</span>`;
     }
 
     // --- Header row: badge (left) + timestamp (right) ---
@@ -236,16 +245,21 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============================================================================
 
   function buildReportBlock(rep) {
-    const isConsistent = rep.verdict?.is_consistent;
     const label = (rep.verdict?.label || "").toUpperCase();
-    
-    let badgeDef = { cls: "neutral", label: "— Neutral" };
-    if (isConsistent === false || label.includes("CONTRADICT")) {
-      badgeDef = { cls: "contradiction", label: "🚨 Contradiction" };
-    } else if (isConsistent === true || label.includes("CONSISTENT")) {
+    const isContradiction = label.includes("CONTRADICT");
+    const isConsistent    = label.includes("CONSISTENT");
+    const isNoPrior       = !rep.historical_claim?.statement;
+
+    let badgeDef = { cls: "neutral", label: "— No Prior Record" };
+    if (isContradiction) {
+      badgeDef = { cls: "contradiction", label: "🚨 Inconsistent" };
+    } else if (isConsistent) {
       badgeDef = { cls: "consistent", label: "✓ Consistent" };
-    } else if (rep.pipeline_status && rep.pipeline_status.includes("unverified")) {
-      badgeDef = { cls: "unverified", label: "◈ Unverified" };
+    } else if (
+      rep.pipeline_status === "added_unverified" ||
+      rep.pipeline_status === "skipped_unverified"
+    ) {
+      badgeDef = { cls: "added", label: "📥 First Record" };
     }
 
     const block = document.createElement("div");
@@ -277,13 +291,25 @@ document.addEventListener("DOMContentLoaded", () => {
       block.appendChild(claimRow);
     }
 
-    // Collapsible historical comparison (12.2.a)
+    // Inconsistency reason — shown prominently when it's a contradiction
+    if (isContradiction && rep.verdict?.explanation) {
+      const reasonBox = document.createElement("div");
+      reasonBox.className = "inconsistency-reason";
+      reasonBox.innerHTML = `<span class="inconsistency-label">Why inconsistent:</span> ${_escapeHtml(rep.verdict.explanation)}`;
+      block.appendChild(reasonBox);
+    }
+
+    // Collapsible historical comparison — auto-open for contradictions
     if (rep.historical_claim?.statement) {
       const details = document.createElement("details");
       details.className = "historical-block";
+      if (isContradiction) details.open = true; // auto-expand on contradiction
 
       const summary = document.createElement("summary");
-      summary.textContent = "Historical match";
+      const historicalDate = rep.historical_claim.claim_date
+        ? ` (${rep.historical_claim.claim_date})`
+        : "";
+      summary.textContent = `Previous claim${historicalDate}`;
       details.appendChild(summary);
 
       const quote = document.createElement("blockquote");
@@ -292,9 +318,23 @@ document.addEventListener("DOMContentLoaded", () => {
       details.appendChild(quote);
 
       block.appendChild(details);
+    } else if (!isContradiction && !isConsistent && rep.pipeline_status !== "added_unverified" && rep.pipeline_status !== "skipped_unverified") {
+      // No prior record note
+      const noPrior = document.createElement("div");
+      noPrior.className = "no-prior-note";
+      noPrior.textContent = "📢 No prior historical claims found for this topic.";
+      block.appendChild(noPrior);
     }
 
-    // Numeric diff badge (12.2.a — only for numeric claims)
+    // "Added to DB" note
+    if (rep.pipeline_status === "added_unverified") {
+      const addedNote = document.createElement("div");
+      addedNote.className = "added-note";
+      addedNote.textContent = "📥 First claim on this topic — added to the knowledge base.";
+      block.appendChild(addedNote);
+    }
+
+    // Numeric diff badge
     if (rep.verdict?.type === "numeric" && rep.verdict.absolute_drift !== undefined) {
       const absVal = rep.verdict.absolute_drift;
       const percentVal = rep.verdict.percentage_variance;
@@ -316,8 +356,8 @@ document.addEventListener("DOMContentLoaded", () => {
       block.appendChild(diffBadge);
     }
 
-    // Explanation (12.2.a)
-    if (rep.verdict?.explanation) {
+    // Explanation — shown for consistent / numeric / no-prior cases (not contradiction, which gets the reason box)
+    if (rep.verdict?.explanation && !isContradiction) {
       const explain = document.createElement("div");
       explain.className = "log-explanation";
       explain.textContent = rep.verdict.explanation;
@@ -328,31 +368,44 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ============================================================================
+  // HTML escape helper
+  // ============================================================================
+  function _escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // ============================================================================
   // Task 12.2.e — Global Stats Bar
   // ============================================================================
 
   function updateStatsBar(logs) {
     let contradictions = 0;
     let consistent = 0;
-    let unverified = 0;
+    let addedToDB = 0;
     let analyzing = 0;
 
     logs.forEach((log) => {
       if (log.report === null) {
         analyzing++;
-      } else if (log.report.pipeline_status === "no_claim") {
-        // ignore in stats
-      } else if (log.report.pipeline_status && log.report.pipeline_status.includes("unverified")) {
-        unverified++;
+      } else if (
+        log.report.pipeline_status === "no_claim" ||
+        log.report.pipeline_status === "skipped_unverified"
+      ) {
+        // not counted in the main stats
+      } else if (log.report.pipeline_status === "added_unverified") {
+        addedToDB++;
       } else {
-        const isConsistent = log.report.verdict?.is_consistent;
         const label = (log.report.verdict?.label || "").toUpperCase();
-        if (isConsistent === false || label.includes("CONTRADICT")) {
+        if (label.includes("CONTRADICT")) {
           contradictions++;
-        } else if (isConsistent === true || label.includes("CONSISTENT")) {
+        } else if (label.includes("CONSISTENT")) {
           consistent++;
         } else {
-          unverified++;
+          addedToDB++; // "No prior record" counts as a new addition
         }
       }
     });
@@ -360,11 +413,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("stat-sentences").textContent =
       `${logs.length} sentence${logs.length !== 1 ? "s" : ""}`;
     document.getElementById("stat-contradictions").textContent =
-      `${contradictions} contradiction${contradictions !== 1 ? "s" : ""}`;
+      `${contradictions} inconsistent`;
     document.getElementById("stat-consistent").textContent =
       `${consistent} consistent`;
     document.getElementById("stat-unverified").textContent =
-      `${unverified} unverified`;
+      `${addedToDB} added to db`;
   }
 
   // ============================================================================

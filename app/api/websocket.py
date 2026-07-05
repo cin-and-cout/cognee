@@ -63,6 +63,7 @@ async def websocket_live_speech(websocket: WebSocket):
 
             # Process the incoming live sentence
             logger.info("📥 [ws] Received sentence (%d words): %s", word_count, sentence)
+            report = None
             try:
                 report = await process_incoming_sentence(
                     text=sentence,
@@ -78,8 +79,15 @@ async def websocket_live_speech(websocket: WebSocket):
                         report.get("new_claim", {}).get("topic", "unknown")
                     )
             except Exception as e:
+                # Do NOT re-raise — that would kill the entire WebSocket connection
+                # for all future sentences. Log the error and return a safe error
+                # report so the client can update its UI instead of staying in
+                # the permanent ⋯ Analysing… state.
                 logger.exception("❌ [ws] Error processing sentence: %s", sentence)
-                raise e
+                report = {
+                    "pipeline_status": "error",
+                    "error": str(e),
+                }
 
             payload = {
                 "text": sentence,
