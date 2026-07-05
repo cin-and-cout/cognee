@@ -32,7 +32,7 @@ async def test_nli_classifier_no_historical():
 
 @pytest.mark.asyncio
 @patch(
-    "app.services.comparison.nli_classifier.LLMGateway.acreate_structured_output",
+    "app.services.comparison.nli_classifier.acreate_structured_output_with_rotation",
     new_callable=AsyncMock,
 )
 async def test_nli_classifier_consistent(mock_gateway):
@@ -69,7 +69,7 @@ async def test_nli_classifier_consistent(mock_gateway):
 
 @pytest.mark.asyncio
 @patch(
-    "app.services.comparison.nli_classifier.LLMGateway.acreate_structured_output",
+    "app.services.comparison.nli_classifier.acreate_structured_output_with_rotation",
     new_callable=AsyncMock,
 )
 async def test_nli_classifier_contradiction(mock_gateway):

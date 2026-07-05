@@ -55,12 +55,26 @@ async def acreate_structured_output_with_rotation(
                 error_msg = str(e)
                 exception_name = e.__class__.__name__
                 RATE_LIMIT_KEYWORDS = [
-                    "InstructorRetryException", "RateLimitError", "RESOURCE_EXHAUSTED",
-                    "429", "rate_limit", "quota", "QuotaExceeded",
-                    "503", "overloaded", "ServiceUnavailable", "service_unavailable",
-                    "Too Many Requests",
+                    "RateLimitError", "RESOURCE_EXHAUSTED", "429", "rate_limit", "quota",
+                    "QuotaExceeded", "503", "overloaded", "ServiceUnavailable",
+                    "service_unavailable", "Too Many Requests",
                 ]
-                if any(keyword.lower() in error_msg.lower() for keyword in RATE_LIMIT_KEYWORDS) or "InstructorRetryException" in exception_name:
+                
+                is_rate_limit = False
+                error_msg_lower = error_msg.lower()
+                
+                # Check for rate limit keywords in the error message
+                if any(keyword.lower() in error_msg_lower for keyword in RATE_LIMIT_KEYWORDS):
+                    is_rate_limit = True
+                
+                # Also check the cause if it's an InstructorRetryException
+                if not is_rate_limit and hasattr(e, "__cause__") and e.__cause__:
+                    cause_msg = str(e.__cause__).lower()
+                    if any(keyword.lower() in cause_msg for keyword in RATE_LIMIT_KEYWORDS):
+                        is_rate_limit = True
+                        error_msg = f"{error_msg} (Cause: {cause_msg})"
+
+                if is_rate_limit:
                     llm_key_pool.mark_rate_limited(key)
                     remaining = llm_key_pool.available_count()
                     logger.warning(

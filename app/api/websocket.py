@@ -50,6 +50,7 @@ async def websocket_live_speech(websocket: WebSocket):
             sentence = data.get("sentence", "").strip()
             speaker = data.get("speaker", "Unknown Speaker")
             speaker_confidence = data.get("speakerConfidence", "low")
+            log_id = data.get("logId")
             if not sentence:
                 continue
 
@@ -134,6 +135,7 @@ async def websocket_live_speech(websocket: WebSocket):
             # ──────────────────────────────────────────────────────────────
 
             payload = {
+                "logId": log_id,
                 "text": sentence,
                 "speaker": speaker,
                 "speakerConfidence": speaker_confidence,
@@ -155,7 +157,25 @@ async def websocket_live_speech(websocket: WebSocket):
         )
         logger.exception("❌ [ws] Uncaught websocket error:")
         try:
-            await websocket.send_json({"error": f"Internal server error: {str(e)}"})
+            error_payload = {
+                "error": f"Internal server error: {str(e)}",
+                "report": {
+                    "pipeline_status": "error",
+                    "error": str(e),
+                }
+            }
+            # Safely check if variables exist in locals and attach them
+            local_vars = locals()
+            if "sentence" in local_vars:
+                error_payload["text"] = local_vars["sentence"]
+            if "log_id" in local_vars:
+                error_payload["logId"] = local_vars["log_id"]
+            if "speaker" in local_vars:
+                error_payload["speaker"] = local_vars["speaker"]
+            if "speaker_confidence" in local_vars:
+                error_payload["speakerConfidence"] = local_vars["speaker_confidence"]
+            
+            await websocket.send_json(error_payload)
             await websocket.close()
         except Exception:
             pass

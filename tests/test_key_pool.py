@@ -35,7 +35,7 @@ async def test_all_keys_exhausted(keys):
     pool.mark_rate_limited("key3")
     
     with pytest.raises(AllKeysExhaustedError):
-        await pool.next_key()
+        await pool.next_key(wait_for_cooldown=False)
 
 @pytest.mark.asyncio
 @patch("app.services.key_pool.time.time")

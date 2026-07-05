@@ -757,6 +757,9 @@ function connectWebSocket(url) {
           // yet, retry up to 5 times (250ms total) rather than creating a
           // duplicate entry — this is the root cause of double feed items.
           _attachReportToLog(data.text, data, 0);
+        } else if (data.error) {
+          console.error("[bg] Server returned error message:", data.error);
+          _markMostRecentPendingAsError(data.error);
         }
       } catch (err) {
         console.error("Error parsing WebSocket message:", err);
@@ -771,6 +774,7 @@ function connectWebSocket(url) {
       console.log("WebSocket closed");
       chrome.storage.local.set({ isRunning: false });
       chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: false });
+      abortPendingLogs();
 
       // Auto-reconnect with exponential back-off (max 5 attempts)
       if (_lastWsUrl && _reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
@@ -786,6 +790,7 @@ function connectWebSocket(url) {
     console.error("Connection failed:", err);
     chrome.storage.local.set({ isRunning: false });
     chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: false });
+    abortPendingLogs();
   }
 }
 
@@ -801,6 +806,7 @@ function disconnectWebSocket() {
   streamBuffer.reset();
   pendingSentences = []; // discard any buffered sentences on explicit disconnect
   chrome.storage.local.set({ isRunning: false });
+  abortPendingLogs();
 }
 
 // ============================================================================
@@ -886,17 +892,77 @@ function processFullTranscript(segments) {
   }
 
   const fullText  = segments.map((s) => s.text).join(" ");
-  console.log(`[bg] 📄 processFullTranscript: Received ${segments.length} segments, total ${fullText.length} chars. Sample: "${fullText.substring(0, 200)}..."`);
+  console.log(`[bg] 📄 processFullTranscript: Received ${segments.length} segments, total ${fullText.length} chars.`);
   const sentences = splitIntoSentences(fullText);
 
   console.log(`[bg] 📄 Transcript: split into ${sentences.length} sentences.`);
 
-  sentences.forEach((sentence, i) => {
-    const trimmed = sentence.trim();
-    if (!trimmed) return;
-    
-    console.log(`[bg] 📄 Transcript sentence [${i + 1}/${sentences.length}] (${trimmed.split(/\s+/).length} words): "${trimmed}"`);
-    handleSegmentedSentence(trimmed);
+  chrome.storage.local.get("logs", (data) => {
+    const logs = data.logs || [];
+    const newLogs = [];
+
+    sentences.forEach((sentence) => {
+      const trimmed = sentence.trim();
+      if (!trimmed) return;
+
+      const cleanText = trimmed;
+      const finalSpeaker = currentSpeaker;
+      const logId = crypto.randomUUID();
+
+      // Send to backend
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        const payload = JSON.stringify({ 
+          logId: logId,
+          sentence: cleanText,
+          speaker: finalSpeaker,
+          speakerConfidence: speakerConfidence
+        });
+        socket.send(payload);
+        console.log(`[bg] ✉️  Sentence sent to backend: "${cleanText}" (Speaker: ${finalSpeaker})`);
+      } else {
+        if (pendingSentences.length < MAX_PENDING_SENTENCES) {
+          pendingSentences.push({ text: cleanText, speaker: finalSpeaker, confidence: speakerConfidence, logId: logId });
+          console.log(`[bg] 📬 Queued sentence (${pendingSentences.length}/${MAX_PENDING_SENTENCES}): "${cleanText}"`);
+        }
+      }
+
+      if (!logs.some((l) => l.text === cleanText) && !newLogs.some((l) => l.text === cleanText)) {
+        newLogs.push({
+          logId: logId,
+          timestamp: Date.now(),
+          text: cleanText,
+          report: null,
+          speaker: finalSpeaker,
+          speakerConfidence: speakerConfidence
+        });
+      }
+    });
+
+    if (newLogs.length > 0) {
+      logs.push(...newLogs);
+      while (logs.length > 50) {
+        logs.shift();
+      }
+      chrome.storage.local.set({ logs }, () => {
+        chrome.runtime.sendMessage({ action: "NEW_LOG" });
+        // Set individual timeouts for each new log
+        newLogs.forEach(l => {
+          setTimeout(() => {
+            chrome.storage.local.get("logs", (store) => {
+              const currentLogs = store.logs || [];
+              const targetLog = currentLogs.find(x => x.logId === l.logId);
+              if (targetLog && targetLog.report === null) {
+                console.log(`[bg] ⏱️ Timeout reached for logId ${l.logId}. Marking as timeout.`);
+                targetLog.report = { pipeline_status: "timeout" };
+                chrome.storage.local.set({ logs: currentLogs }, () => {
+                  chrome.runtime.sendMessage({ action: "NEW_LOG" });
+                });
+              }
+            });
+          }, 180000);
+        });
+      });
+    }
   });
 }
 
@@ -968,4 +1034,52 @@ function handleSegmentedSentence(text, speakerOverride = null) {
     }
   });
 }
+
+/**
+ * Finds all pending logs (where report is null) and marks them as disconnected.
+ * Called when the socket closes or on background script startup/reload.
+ */
+function abortPendingLogs() {
+  chrome.storage.local.get("logs", (store) => {
+    const logs = store.logs || [];
+    let updated = false;
+    logs.forEach(log => {
+      if (log.report === null) {
+        log.report = { pipeline_status: "disconnected" };
+        updated = true;
+      }
+    });
+    if (updated) {
+      console.log("[bg] ⚠️ Aborted pending logs (marked as disconnected)");
+      chrome.storage.local.set({ logs }, () => {
+        chrome.runtime.sendMessage({ action: "NEW_LOG" });
+      });
+    }
+  });
+}
+
+/**
+ * Finds the most recent log with report === null and marks it as failed with uvicorn error.
+ */
+function _markMostRecentPendingAsError(errMsg) {
+  chrome.storage.local.get("logs", (store) => {
+    const logs = store.logs || [];
+    // Sort logs descending by timestamp to find the newest pending first
+    const sortedPending = logs
+      .filter(l => l.report === null)
+      .sort((a, b) => b.timestamp - a.timestamp);
+    
+    if (sortedPending.length > 0) {
+      const target = sortedPending[0];
+      console.log(`[bg] 🛑 Marking newest pending log as error due to server fault: "${target.text}"`);
+      target.report = { pipeline_status: "error", error: errMsg };
+      chrome.storage.local.set({ logs }, () => {
+        chrome.runtime.sendMessage({ action: "NEW_LOG" });
+      });
+    }
+  });
+}
+
+// Clean up stale logs on startup
+abortPendingLogs();
 

@@ -2,6 +2,11 @@ import os
 import logging
 from dotenv import load_dotenv
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+)
+
 logger = logging.getLogger(__name__)
 
 # Load .env
@@ -42,4 +47,15 @@ if not _keys:
 cooldown = int(os.getenv("KEY_COOLDOWN_SECONDS", "60"))
 llm_key_pool = LLMKeyPool(_keys, cooldown_duration=cooldown)
 logger.info("Key pool created", extra={"cooldown_duration": cooldown})
+
+# Overwrite raw comma-separated variables in the system environment with the first key
+# so third-party packages (like Cognee) that don't support multi-keys don't fail connection tests.
+if gemini_keys:
+    os.environ["GEMINI_API_KEY"] = gemini_keys[0]
+if _keys:
+    os.environ["LLM_API_KEY"] = _keys[0]
+
+embedding_keys = _parse_keys("EMBEDDING_API_KEY")
+if embedding_keys:
+    os.environ["EMBEDDING_API_KEY"] = embedding_keys[0]
 

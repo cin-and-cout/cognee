@@ -4,6 +4,7 @@ from typing import Optional
 from app.services.coreference import SpeechContext, has_references
 
 from app.services.llm_caller import acreate_structured_output_with_rotation
+from app.services.key_pool import AllKeysExhaustedError
 from pydantic import BaseModel, Field
 
 from app.schemas import Claim, Politician, Topic
@@ -170,6 +171,8 @@ async def extract_claim_from_text(
 
         return claim_node
 
+    except AllKeysExhaustedError:
+        raise
     except Exception as e:
         logger.exception(f"Error extracting claim from text: {e}")
         return None

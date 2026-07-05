@@ -179,6 +179,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (log.report === null) {
       // Still waiting for backend response
       badgeHtml = `<span class="verdict-badge analyzing">⏳ Analysing…</span>`;
+    } else if (log.report.pipeline_status === "rate_limited") {
+      badgeHtml = `<span class="verdict-badge analyzing">🔁 Rate Limited</span>`;
+    } else if (log.report.pipeline_status === "timeout") {
+      badgeHtml = `<span class="verdict-badge error">⌛ Timed Out</span>`;
     } else if (log.report.pipeline_status === "no_claim") {
       badgeHtml = `<span class="verdict-badge no-claim">✕ Not a Valid Claim</span>`;
     } else if (log.report.pipeline_status === "added_unverified") {
@@ -187,6 +191,8 @@ document.addEventListener("DOMContentLoaded", () => {
       badgeHtml = `<span class="verdict-badge skipped">⚠ Skipped — Low Confidence</span>`;
     } else if (log.report.pipeline_status === "error") {
       badgeHtml = `<span class="verdict-badge error">⚠️ Processing Error</span>`;
+    } else if (log.report.pipeline_status === "ingest_error") {
+      badgeHtml = `<span class="verdict-badge error">⚠️ Saved — DB Error</span>`;
     } else if (
       log.report.pipeline_status === "compared_added" ||
       log.report.pipeline_status === "compared_skipped"
@@ -393,7 +399,11 @@ document.addEventListener("DOMContentLoaded", () => {
         analyzing++;
       } else if (
         log.report.pipeline_status === "no_claim" ||
-        log.report.pipeline_status === "skipped_unverified"
+        log.report.pipeline_status === "skipped_unverified" ||
+        log.report.pipeline_status === "rate_limited" ||
+        log.report.pipeline_status === "timeout" ||
+        log.report.pipeline_status === "error" ||
+        log.report.pipeline_status === "ingest_error"
       ) {
         // not counted in the main stats
       } else if (log.report.pipeline_status === "added_unverified") {
