@@ -731,9 +731,10 @@ function connectWebSocket(url) {
         console.log(`[bg] 🚀 Draining ${pendingSentences.length} queued sentence(s) into backend.`);
         const toSend = pendingSentences.slice();
         pendingSentences = [];
-        toSend.forEach(({ text, speaker, confidence }) => {
+        toSend.forEach(({ text, speaker, confidence, logId }) => {
           try {
             socket.send(JSON.stringify({
+              logId: logId,
               sentence: text,
               speaker: speaker,
               speakerConfidence: confidence,
@@ -822,9 +823,15 @@ function _attachReportToLog(text, data, attempt) {
   const MAX_RETRIES = 5;
   const RETRY_MS = 50;
 
+  const normalize = (str) => (str || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const incomingNorm = normalize(text);
+  const logId = data.logId;
+
   chrome.storage.local.get("logs", (store) => {
     const logs = store.logs || [];
-    const existingLog = logs.find((l) => l.text === text);
+    const existingLog = logs.find((l) => 
+      (logId && l.logId === logId) || normalize(l.text) === incomingNorm
+    );
 
     if (existingLog) {
       // Found — attach the report and persist
@@ -843,6 +850,7 @@ function _attachReportToLog(text, data, attempt) {
       // Gave up retrying — create the entry so the verdict is not lost
       console.warn("_attachReportToLog: gave up waiting for log entry, creating fallback.");
       logs.push({ 
+        logId: logId || crypto.randomUUID(),
         timestamp: Date.now(), 
         text, 
         report: data.report, 
@@ -900,9 +908,11 @@ function handleSegmentedSentence(text, speakerOverride = null) {
 
   const cleanText = text.trim();
   const finalSpeaker = speakerOverride ?? currentSpeaker;
+  const logId = crypto.randomUUID();
 
   if (socket && socket.readyState === WebSocket.OPEN) {
     const payload = JSON.stringify({ 
+      logId: logId,
       sentence: cleanText,
       speaker: finalSpeaker,
       speakerConfidence: speakerConfidence
@@ -914,7 +924,7 @@ function handleSegmentedSentence(text, speakerOverride = null) {
     // connects. This is the common case when a full transcript is processed
     // before the user clicks "Connect & Listen".
     if (pendingSentences.length < MAX_PENDING_SENTENCES) {
-      pendingSentences.push({ text: cleanText, speaker: finalSpeaker, confidence: speakerConfidence });
+      pendingSentences.push({ text: cleanText, speaker: finalSpeaker, confidence: speakerConfidence, logId: logId });
       console.log(`[bg] 📬 Queued sentence (${pendingSentences.length}/${MAX_PENDING_SENTENCES}): "${cleanText}"`);
     } else {
       console.warn(`[bg] ⚠️  Pending queue full (${MAX_PENDING_SENTENCES}). Dropping: "${cleanText}"`);
@@ -925,6 +935,7 @@ function handleSegmentedSentence(text, speakerOverride = null) {
     const logs = data.logs || [];
     if (!logs.some((l) => l.text === cleanText)) {
       logs.push({
+        logId: logId,
         timestamp: Date.now(),
         text: cleanText,
         report: null,
@@ -936,6 +947,23 @@ function handleSegmentedSentence(text, speakerOverride = null) {
       }
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
+
+        // 180s timeout to mark as "timeout" if still null.
+        // Sized to survive a full 60s key-pool cooldown + LLM call + Cognee ingestion.
+        // (Previously 90s, which fired before the server could respond during rate-limiting.)
+        setTimeout(() => {
+          chrome.storage.local.get("logs", (store) => {
+            const currentLogs = store.logs || [];
+            const targetLog = currentLogs.find(l => l.logId === logId);
+            if (targetLog && targetLog.report === null) {
+              console.log(`[bg] ⏱️ Timeout reached for logId ${logId}. Marking as timeout.`);
+              targetLog.report = { pipeline_status: "timeout" };
+              chrome.storage.local.set({ logs: currentLogs }, () => {
+                chrome.runtime.sendMessage({ action: "NEW_LOG" });
+              });
+            }
+          });
+        }, 180000);
       });
     }
   });

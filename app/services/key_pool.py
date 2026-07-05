@@ -18,7 +18,7 @@ class LLMKeyPool:
         self._lock = asyncio.Lock()
         logger.info("Key pool initialized", extra={"keys_loaded": len(keys)})
 
-    async def next_key(self) -> str:
+    async def next_key(self, wait_for_cooldown: bool = True) -> str:
         if not self._keys:
             logger.error("All keys exhausted", extra={"total_keys": 0, "cooldowns": {}})
             raise AllKeysExhaustedError("No keys provided to the pool.")
@@ -44,8 +44,45 @@ class LLMKeyPool:
                     return key
                     
                 if self._index == start_index:
-                    logger.error("All keys exhausted", extra={"total_keys": len(self._keys), "cooldowns": self._cooldown_status_unlocked(now)})
-                    raise AllKeysExhaustedError("All keys are currently exhausted and on cooldown.")
+                    if wait_for_cooldown:
+                        status = self._cooldown_status_unlocked(now)
+                        if status:
+                            shortest = min(status.values())
+                            logger.warning(
+                                "All keys exhausted. Waiting for shortest cooldown",
+                                extra={"wait_seconds": round(shortest, 1), "cooldowns": status}
+                            )
+                            pass  # Handled below outside the lock
+                        else:
+                            raise AllKeysExhaustedError("All keys exhausted and no cooldowns available.")
+                    else:
+                        logger.error("All keys exhausted", extra={"total_keys": len(self._keys), "cooldowns": self._cooldown_status_unlocked(now)})
+                        raise AllKeysExhaustedError("All keys are currently exhausted and on cooldown.")
+                    break  # Break to handle wait outside the lock
+
+        if wait_for_cooldown and self._index == start_index:
+            # Heartbeat sleep: log every second so the server console is never silent
+            # during a rate-limit cooldown, making it easy to tell the server is alive.
+            wait_total = shortest + 0.5
+            elapsed = 0.0
+            TICK = 1.0  # seconds between heartbeat log lines
+            logger.warning(
+                "[key_pool] ⏳ Cooling down — sleeping %.1fs before retrying LLM calls",
+                wait_total,
+            )
+            while elapsed < wait_total:
+                tick = min(TICK, wait_total - elapsed)
+                await asyncio.sleep(tick)
+                elapsed += tick
+                remaining = max(0.0, wait_total - elapsed)
+                if remaining > 0:
+                    logger.warning(
+                        "[key_pool] ⏳ Still cooling down — %.1fs remaining",
+                        remaining,
+                    )
+            logger.info("[key_pool] ✅ Cooldown complete — retrying key pool")
+            # Retry with full rotation enabled so we pick the first available key
+            return await self.next_key(wait_for_cooldown=True)
 
     def mark_rate_limited(self, key: str):
         self._cooldowns[key] = time.time()

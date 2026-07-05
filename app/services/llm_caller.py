@@ -32,7 +32,7 @@ async def acreate_structured_output_with_rotation(
         model = os.getenv("LLM_MODEL", "gemini/gemini-3.5-flash")
         while True:
             attempt += 1
-            key = await llm_key_pool.next_key()
+            key = await llm_key_pool.next_key(wait_for_cooldown=True)
             key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
             try:
                 logger.info("LLM call started", extra={"model": model, "key_preview": key_preview, "response_model": response_model.__name__, "attempt": attempt})
@@ -54,7 +54,13 @@ async def acreate_structured_output_with_rotation(
             except Exception as e:
                 error_msg = str(e)
                 exception_name = e.__class__.__name__
-                if any(keyword in error_msg for keyword in ["InstructorRetryException", "RateLimitError", "RESOURCE_EXHAUSTED", "429"]) or "InstructorRetryException" in exception_name:
+                RATE_LIMIT_KEYWORDS = [
+                    "InstructorRetryException", "RateLimitError", "RESOURCE_EXHAUSTED",
+                    "429", "rate_limit", "quota", "QuotaExceeded",
+                    "503", "overloaded", "ServiceUnavailable", "service_unavailable",
+                    "Too Many Requests",
+                ]
+                if any(keyword.lower() in error_msg.lower() for keyword in RATE_LIMIT_KEYWORDS) or "InstructorRetryException" in exception_name:
                     llm_key_pool.mark_rate_limited(key)
                     remaining = llm_key_pool.available_count()
                     logger.warning(
@@ -64,7 +70,10 @@ async def acreate_structured_output_with_rotation(
                     )
                     continue
                 
-                logger.error("LLM call failed", extra={"exception": exception_name, "error_msg": error_msg, "attempt": attempt})
+                logger.error(
+                    "[llm] ❌ Unrecognised exception — re-raising (not a rate-limit)",
+                    extra={"exception": exception_name, "error_msg": error_msg[:200], "attempt": attempt}
+                )
                 # If it's a different exception, re-raise it
                 raise e
     except AllKeysExhaustedError:
