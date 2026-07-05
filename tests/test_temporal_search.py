@@ -113,3 +113,73 @@ async def test_temporal_search():
     # Query non-existent topic
     no_claims = await get_historical_claims(topic_name="Education")
     assert len(no_claims) == 0
+
+
+@pytest.mark.asyncio
+async def test_historical_claims_speaker_isolation():
+    """Claims from different politicians on the same topic must not bleed into each other's results."""
+    from cognee.infrastructure.databases.graph.get_graph_engine import get_graph_engine
+    from cognee.infrastructure.databases.vector import get_vector_engine
+
+    graph_engine = await get_graph_engine()
+    await graph_engine.delete_graph()
+
+    vector_engine = get_vector_engine()
+    await vector_engine.prune()
+
+    await cognee.prune.prune_data()
+    await cognee.prune.prune_system(metadata=True)
+
+    # Setup mock entities
+    politician_a = Politician(name="Governor Vance", party="Republican")
+    politician_b = Politician(name="Mayor Smith", party="Democrat")
+    topic = Topic(name="Housing")
+
+    # Claim for Politician A
+    claim_a = Claim(
+        statement="We built 10,000 homes.",
+        politician=politician_a,
+        topic=topic,
+        claim_date="2023-04-10",
+        is_numeric=True,
+        metric="homes built",
+        value=10000.0,
+        unit="homes",
+    )
+    claim_a.politician = politician_a
+    claim_a.topic = topic
+
+    # Claim for Politician B
+    claim_b = Claim(
+        statement="I built 5,000 homes.",
+        politician=politician_b,
+        topic=topic,
+        claim_date="2024-06-15",
+        is_numeric=True,
+        metric="homes built",
+        value=5000.0,
+        unit="homes",
+    )
+    claim_b.politician = politician_b
+    claim_b.topic = topic
+
+    # Ingest data points
+    await add_data_points([politician_a, politician_b, topic, claim_a, claim_b])
+
+    # Query specifically with politician A filter
+    claims_a = await get_historical_claims(
+        topic_name="Housing",
+        politician_name="Governor Vance",
+    )
+    assert len(claims_a) == 1
+    assert claims_a[0].politician.name == "Governor Vance"
+    assert claims_a[0].value == 10000.0
+
+    # Query specifically with politician B filter
+    claims_b = await get_historical_claims(
+        topic_name="Housing",
+        politician_name="Mayor Smith",
+    )
+    assert len(claims_b) == 1
+    assert claims_b[0].politician.name == "Mayor Smith"
+    assert claims_b[0].value == 5000.0

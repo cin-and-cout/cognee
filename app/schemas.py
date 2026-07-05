@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from cognee.infrastructure.engine import DataPoint
 from pydantic import SkipValidation, field_validator
@@ -45,6 +45,7 @@ class Claim(DataPoint):
     claim_date: str  # Format: YYYY-MM-DD (validated on input)
     source_link: Optional[str] = None
     speaker_confidence: str = "low"
+    source_type: Literal["historical", "live"] = "historical"
 
     # Quantitative fields for numeric drift comparison
     is_numeric: bool = False
@@ -53,7 +54,7 @@ class Claim(DataPoint):
     unit: Optional[str] = None  # e.g., "%", "billion dollars"
 
     metadata: dict = {
-        "index_fields": ["statement", "metric"],
+        "index_fields": ["statement", "metric", "source_type"],
     }
 
     @field_validator("claim_date", mode="before")

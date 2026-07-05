@@ -66,6 +66,7 @@ async def test_orchestrator_numeric_flow(
         text="Inflation is now at 3.0%.",
         politician_name="Governor Vance",
         claim_date="2026-06-29",
+        speaker_confidence="high",
     )
 
     assert report is not None
@@ -73,9 +74,10 @@ async def test_orchestrator_numeric_flow(
     assert report["historical_claim"]["statement"] == "Inflation was 4.0%."
     assert report["verdict"]["is_consistent"] is False
     assert report["verdict"]["type"] == "numeric"
+    assert report["pipeline_status"] == "compared_added"
 
     mock_extract.assert_called_once()
-    mock_get_hist.assert_called_once_with("Inflation")
+    mock_get_hist.assert_called_once_with("Inflation", politician_name="Governor Vance")
     mock_calc_diff.assert_called_once_with(hist_claim, new_claim)
     mock_add_data_points.assert_called_once()
     mock_add.assert_called_once_with("historical_claims", dataset_name="default_dataset")
@@ -134,6 +136,7 @@ async def test_orchestrator_qualitative_flow(
         text="Passenger fares are frozen.",
         politician_name="Governor Vance",
         claim_date="2026-06-29",
+        speaker_confidence="high",
     )
 
     assert report is not None
@@ -141,10 +144,55 @@ async def test_orchestrator_qualitative_flow(
     assert report["historical_claim"]["statement"] == ("We plan to freeze passenger fares.")
     assert report["verdict"]["label"] == "Consistent with prior statements"
     assert report["verdict"]["type"] == "qualitative"
+    assert report["pipeline_status"] == "compared_added"
 
     mock_extract.assert_called_once()
-    mock_get_hist.assert_called_once_with("Transit")
+    mock_get_hist.assert_called_once_with("Transit", politician_name="Governor Vance")
     mock_nli.assert_called_once_with(new_claim, hist_claim)
     mock_add_data_points.assert_called_once()
     mock_add.assert_called_once_with("historical_claims", dataset_name="default_dataset")
     mock_cognify.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("app.services.orchestrator.extract_claim_from_text", new_callable=AsyncMock)
+@patch("app.services.orchestrator.get_historical_claims", new_callable=AsyncMock)
+@patch("app.services.orchestrator.add_data_points", new_callable=AsyncMock)
+@patch("app.services.orchestrator.cognee.add", new_callable=AsyncMock)
+@patch("app.services.orchestrator.cognee.cognify", new_callable=AsyncMock)
+async def test_orchestrator_low_confidence_skips_ingestion(
+    mock_cognify,
+    mock_add,
+    mock_add_data_points,
+    mock_get_hist,
+    mock_extract,
+):
+    """When speaker_confidence is 'low', claim must NOT be ingested."""
+    politician = Politician(name="Unknown Speaker")
+    topic = Topic(name="Economy")
+
+    new_claim = Claim(
+        statement="Economy is booming.",
+        politician=politician,
+        topic=topic,
+        claim_date="2026-06-29",
+        is_numeric=False,
+    )
+    new_claim.politician = politician
+    new_claim.topic = topic
+
+    mock_extract.return_value = new_claim
+    mock_get_hist.return_value = []
+
+    report = await process_incoming_sentence(
+        text="Economy is booming.",
+        politician_name="Unknown Speaker",
+        claim_date="2026-06-29",
+        speaker_confidence="low",
+    )
+
+    assert report is not None
+    assert report["pipeline_status"] == "skipped_unverified"
+    mock_add_data_points.assert_not_called()
+    mock_add.assert_not_called()
+    mock_cognify.assert_not_called()

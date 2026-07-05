@@ -20,7 +20,7 @@ async def process_incoming_sentence(
     claim_date: str,
     politician_party: Optional[str] = None,
     speaker_confidence: str = "low",
-) -> Optional[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Orchestrates the entire claim consistency pipeline for a single speech sentence:
       1. Extracts a structured claim (if present).
@@ -47,14 +47,20 @@ async def process_incoming_sentence(
     )
     if new_claim:
         new_claim.speaker_confidence = speaker_confidence
+        new_claim.source_type = "live"
 
     if not new_claim:
         logger.info("🤷 [orchestrator] No claim extracted from sentence")
-        return None
+        report = {"pipeline_status": "no_claim"}
+        set_cached_verdict(text, report)
+        return report
     logger.info("🎯 [orchestrator] Claim extracted: topic='%s', is_numeric=%s", new_claim.topic.name, new_claim.is_numeric)
 
     # 2. Retrieve historical claims for the topic
-    historical_claims = await get_historical_claims(new_claim.topic.name)
+    historical_claims = await get_historical_claims(
+        new_claim.topic.name,
+        politician_name=new_claim.politician.name,
+    )
 
     # Filter and find the latest historical claim strictly before the new claim's date
     latest_historical: Optional[Claim] = None
@@ -89,6 +95,8 @@ async def process_incoming_sentence(
         }
 
     # 4. Ingest the new claim historically in the background to minimize response latency
+    should_persist = speaker_confidence in ("high", "medium")
+
     async def run_ingestion():
         try:
             await add_data_points([new_claim.politician, new_claim.topic, new_claim])
@@ -97,7 +105,13 @@ async def process_incoming_sentence(
         except Exception:
             logger.exception("Background claim ingestion failed — data point was NOT persisted to the graph")
 
-    asyncio.create_task(run_ingestion())
+    if should_persist:
+        asyncio.create_task(run_ingestion())
+        logger.info("💾 [orchestrator] Queued claim ingestion (speaker_confidence=%s)", speaker_confidence)
+        pipeline_status = "compared_added" if latest_historical else "added_unverified"
+    else:
+        logger.info("⚠️ [orchestrator] Skipping ingestion — speaker_confidence='%s' (Unknown Speaker)", speaker_confidence)
+        pipeline_status = "compared_skipped" if latest_historical else "skipped_unverified"
     # Yield control to event loop so background task can start executing
     await asyncio.sleep(0.001)
 
@@ -125,6 +139,7 @@ async def process_incoming_sentence(
             else None
         ),
         "verdict": verdict,
+        "pipeline_status": pipeline_status,
     }
 
     # Save to cache

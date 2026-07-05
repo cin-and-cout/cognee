@@ -1,5 +1,16 @@
 let socket = null;
 let reconnectTimer = null;
+let _lastWsUrl = null;      // remembered so auto-reconnect uses the right URL
+let _reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+// ============================================================================
+// Pending Sentence Queue — buffers sentences that arrive before the WebSocket
+// is open (e.g. when a full transcript is processed before the user clicks
+// "Connect & Listen"). Drained in socket.onopen.
+// ============================================================================
+let pendingSentences = [];
+const MAX_PENDING_SENTENCES = 250; // safety cap
 
 // ============================================================================
 // Speaker Attribution State (Milestone 13)
@@ -703,6 +714,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 function connectWebSocket(url) {
   disconnectWebSocket();
+  _lastWsUrl = url;
+  _reconnectAttempts = 0; // reset on intentional connect
 
   try {
     socket = new WebSocket(url);
@@ -711,6 +724,26 @@ function connectWebSocket(url) {
       console.log("WebSocket connected to " + url);
       chrome.storage.local.set({ isRunning: true });
       chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: true });
+
+      // Drain any sentences that were buffered while the socket was closed
+      // (e.g. a full transcript processed before the user clicked Connect).
+      if (pendingSentences.length > 0) {
+        console.log(`[bg] 🚀 Draining ${pendingSentences.length} queued sentence(s) into backend.`);
+        const toSend = pendingSentences.slice();
+        pendingSentences = [];
+        toSend.forEach(({ text, speaker, confidence }) => {
+          try {
+            socket.send(JSON.stringify({
+              sentence: text,
+              speaker: speaker,
+              speakerConfidence: confidence,
+            }));
+            console.log(`[bg] ✉️  [queue-drain] Sent: "${text}"`);
+          } catch (err) {
+            console.error(`[bg] ❌ [queue-drain] Failed to send "${text}":`, err);
+          }
+        });
+      }
     };
 
     socket.onmessage = (event) => {
@@ -737,6 +770,16 @@ function connectWebSocket(url) {
       console.log("WebSocket closed");
       chrome.storage.local.set({ isRunning: false });
       chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: false });
+
+      // Auto-reconnect with exponential back-off (max 5 attempts)
+      if (_lastWsUrl && _reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        _reconnectAttempts++;
+        const delayMs = Math.min(1000 * Math.pow(2, _reconnectAttempts - 1), 16000);
+        console.log(`[bg] 🔄 Auto-reconnecting in ${delayMs}ms (attempt ${_reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})…`);
+        reconnectTimer = setTimeout(() => connectWebSocket(_lastWsUrl), delayMs);
+      } else if (_reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.warn(`[bg] ⚠️  Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Manual reconnect required.`);
+      }
     };
   } catch (err) {
     console.error("Connection failed:", err);
@@ -755,6 +798,7 @@ function disconnectWebSocket() {
     reconnectTimer = null;
   }
   streamBuffer.reset();
+  pendingSentences = []; // discard any buffered sentences on explicit disconnect
   chrome.storage.local.set({ isRunning: false });
 }
 
@@ -866,7 +910,15 @@ function handleSegmentedSentence(text, speakerOverride = null) {
     socket.send(payload);
     console.log(`[bg] ✉️  Sentence sent to backend: "${cleanText}" (Speaker: ${finalSpeaker})`);
   } else {
-    console.log(`[bg] ⚠️  Cannot send — WebSocket not open. Dropping sentence: "${cleanText}"`);
+    // Socket not open yet — queue the sentence so it is sent when the user
+    // connects. This is the common case when a full transcript is processed
+    // before the user clicks "Connect & Listen".
+    if (pendingSentences.length < MAX_PENDING_SENTENCES) {
+      pendingSentences.push({ text: cleanText, speaker: finalSpeaker, confidence: speakerConfidence });
+      console.log(`[bg] 📬 Queued sentence (${pendingSentences.length}/${MAX_PENDING_SENTENCES}): "${cleanText}"`);
+    } else {
+      console.warn(`[bg] ⚠️  Pending queue full (${MAX_PENDING_SENTENCES}). Dropping: "${cleanText}"`);
+    }
   }
 
   chrome.storage.local.get("logs", (data) => {

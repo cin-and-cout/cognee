@@ -275,10 +275,30 @@
       color: #333333;
     }
 
-    .verdict-badge.unverified {
-      background-color: #ffa502;
+    /* Added to DB — first time a topic is recorded */
+    .verdict-badge.added {
+      background-color: #1e90ff;
       color: #ffffff;
     }
+
+    /* Skipped (low confidence) */
+    .verdict-badge.skipped {
+      background-color: #a4b0be;
+      color: #ffffff;
+    }
+
+    /* Not a valid claim */
+    .verdict-badge.no-claim {
+      background-color: #f1f2f6;
+      color: #555555;
+    }
+
+    /* Processing error (backend exception) */
+    .verdict-badge.error {
+      background-color: #ff6b35;
+      color: #ffffff;
+    }
+
 
     /* 12.2.c — Analyzing pulsing badge */
     .verdict-badge.analyzing {
@@ -347,7 +367,8 @@
     .claim-verdict-badge.consistent   { background-color: #2ed573; color: #ffffff; }
     .claim-verdict-badge.contradiction { background-color: #ff5252; color: #ffffff; }
     .claim-verdict-badge.neutral       { background-color: #f1f2f6; color: #333333; }
-    .claim-verdict-badge.unverified    { background-color: #ffa502; color: #ffffff; }
+    .claim-verdict-badge.added         { background-color: #1e90ff; color: #ffffff; }
+    .claim-verdict-badge.skipped       { background-color: #a4b0be; color: #ffffff; }
 
     /* Collapsible historical comparison (12.2.a) */
     .historical-block {
@@ -424,6 +445,45 @@
       line-height: 1.4;
       border-top: 1px dotted #999999;
       padding-top: 4px;
+    }
+
+    /* Inconsistency reason box — shown prominently for contradictions */
+    .inconsistency-reason {
+      margin-top: 8px;
+      padding: 7px 10px;
+      background-color: #fff0f0;
+      border-left: 4px solid #ff5252;
+      border: 2px solid #ff5252;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #2d0000;
+    }
+
+    .inconsistency-label {
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      color: #cc0000;
+      margin-right: 4px;
+    }
+
+    /* "Added to DB" info note */
+    .added-note {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #1a4f8a;
+      padding: 4px 8px;
+      background-color: #e8f4ff;
+      border-left: 3px solid #1e90ff;
+    }
+
+    /* "No prior record" info note */
+    .no-prior-note {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #555555;
+      font-style: italic;
     }
 
     /* Empty state */
@@ -539,11 +599,11 @@
     <div id="stats-bar" class="stats-bar hidden">
       <span class="stat-item" id="stat-sentences">0 sentences</span>
       <span class="stat-sep">|</span>
-      <span class="stat-item" id="stat-contradictions">0 contradictions</span>
+      <span class="stat-item" id="stat-contradictions">0 inconsistent</span>
       <span class="stat-sep">|</span>
       <span class="stat-item" id="stat-consistent">0 consistent</span>
       <span class="stat-sep">|</span>
-      <span class="stat-item" id="stat-unverified">0 unverified</span>
+      <span class="stat-item" id="stat-unverified">0 added to db</span>
     </div>
 
     <div id="feed-list">
