@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import time as _time
+import asyncio
 from collections import deque
 from datetime import datetime, timezone
 
@@ -19,6 +20,10 @@ router = APIRouter()
 # These are legitimate new content, not junk.
 MIN_SENTENCE_WORDS = 1
 DEDUP_WINDOW_SIZE = 20
+
+# Maximum number of sentences processed concurrently.
+# Limits parallel LLM calls to avoid rate-limit storms.
+MAX_CONCURRENT_PIPELINES = 3
 
 
 @router.websocket("/ws/live-speech")
@@ -84,65 +89,107 @@ async def websocket_live_speech(websocket: WebSocket):
             # ──────────────────────────────────────────────────────────────
 
             sentence_history.append(sentence)
-            t_start = _time.perf_counter()
-            
-            report = None
-            try:
-                report = await process_incoming_sentence(
-                    text=sentence,
-                    politician_name=speaker,
-                    claim_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                    politician_party="Progressive Coalition",  # Can be resolved in the future
-                    speaker_confidence=speaker_confidence,
-                    sentence_history=sentence_history,
-                    speech_context=speech_context,
-                    sentence_idx=sentence_idx,
+
+            # Capture values for the closure (they change each loop iteration)
+            _sentence = sentence
+            _speaker = speaker
+            _speaker_confidence = speaker_confidence
+            _log_id = log_id
+            _sentence_idx = sentence_idx
+
+            pipeline_sem = getattr(websocket, "_pipeline_sem", None)
+            if pipeline_sem is None:
+                pipeline_sem = asyncio.Semaphore(MAX_CONCURRENT_PIPELINES)
+                websocket._pipeline_sem = pipeline_sem  # attach to connection
+
+            send_lock = getattr(websocket, "_send_lock", None)
+            if send_lock is None:
+                send_lock = asyncio.Lock()
+                websocket._send_lock = send_lock  # attach to connection
+
+            async def _run_pipeline(
+                sem: asyncio.Semaphore,
+                lock: asyncio.Lock,
+                ws: WebSocket,
+                sent: str,
+                spk: str,
+                spk_conf: str,
+                lid: str,
+                s_idx: int,
+                s_history: deque,
+                s_context: SpeechContext,
+            ):
+                """Process one sentence and send the result back over the WebSocket."""
+                async with sem:
+                    t_start = _time.perf_counter()
+                    report = None
+                    try:
+                        report = await process_incoming_sentence(
+                            text=sent,
+                            politician_name=spk,
+                            claim_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                            politician_party="Progressive Coalition",
+                            speaker_confidence=spk_conf,
+                            sentence_history=s_history,
+                            speech_context=s_context,
+                            sentence_idx=s_idx,
+                        )
+                    except Exception as e:
+                        logger.exception("❌ [ws] Error processing sentence: %s", sent)
+                        report = {
+                            "pipeline_status": "error",
+                            "error": str(e),
+                        }
+
+                    elapsed = _time.perf_counter() - t_start
+
+                    # ── COMPLETION BANNER ──────────────────────────────────
+                    status = (report or {}).get("pipeline_status", "unknown")
+                    verdict_label = (report or {}).get("verdict", {}).get("label", "")
+                    topic = (report or {}).get("new_claim", {}).get("topic", "")
+
+                    if status == "no_claim":
+                        logger.info("✖  [ws] DONE #%d — not a claim  (%.1fs)", s_idx, elapsed)
+                    elif status == "error":
+                        logger.warning("❌ [ws] DONE #%d — pipeline error  (%.1fs)", s_idx, elapsed)
+                    elif verdict_label:
+                        emoji = "🚨" if "contradict" in verdict_label.lower() else "✅"
+                        logger.info(
+                            "%s [ws] DONE #%d — %s | topic=%s | status=%s  (%.1fs)",
+                            emoji, s_idx, verdict_label, topic, status, elapsed,
+                        )
+                    else:
+                        logger.info(
+                            "✅ [ws] DONE #%d — status=%s  (%.1fs)",
+                            s_idx, status, elapsed,
+                        )
+                    logger.info("─" * 60)
+                    # ──────────────────────────────────────────────────────
+
+                    payload = {
+                        "logId": lid,
+                        "text": sent,
+                        "speaker": spk,
+                        "speakerConfidence": spk_conf,
+                        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                        "report": report,
+                    }
+                    try:
+                        async with lock:
+                            await ws.send_json(payload)
+                    except Exception:
+                        logger.warning("⚠️  [ws] Could not send result for #%d (client disconnected?)", s_idx)
+
+            # Fire off the pipeline without awaiting — the loop immediately
+            # goes back to receive_json() to accept the next sentence.
+            asyncio.create_task(
+                _run_pipeline(
+                    pipeline_sem, send_lock, websocket,
+                    _sentence, _speaker, _speaker_confidence, _log_id,
+                    _sentence_idx, sentence_history, speech_context,
                 )
-            except Exception as e:
-                # Do NOT re-raise — that would kill the entire WebSocket connection
-                # for all future sentences. Log the error and return a safe error
-                # report so the client can update its UI instead of staying in
-                # the permanent ⋯ Analysing… state.
-                logger.exception("❌ [ws] Error processing sentence: %s", sentence)
-                report = {
-                    "pipeline_status": "error",
-                    "error": str(e),
-                }
+            )
 
-            elapsed = _time.perf_counter() - t_start
-
-            # ── COMPLETION BANNER ──────────────────────────────────────────
-            status = (report or {}).get("pipeline_status", "unknown")
-            verdict_label = (report or {}).get("verdict", {}).get("label", "")
-            topic = (report or {}).get("new_claim", {}).get("topic", "")
-
-            if status == "no_claim":
-                logger.info("✖  [ws] DONE #%d — not a claim  (%.1fs)", sentence_idx, elapsed)
-            elif status == "error":
-                logger.warning("❌ [ws] DONE #%d — pipeline error  (%.1fs)", sentence_idx, elapsed)
-            elif verdict_label:
-                emoji = "🚨" if "contradict" in verdict_label.lower() else "✅"
-                logger.info(
-                    "%s [ws] DONE #%d — %s | topic=%s | status=%s  (%.1fs)",
-                    emoji, sentence_idx, verdict_label, topic, status, elapsed,
-                )
-            else:
-                logger.info(
-                    "✅ [ws] DONE #%d — status=%s  (%.1fs)",
-                    sentence_idx, status, elapsed,
-                )
-            logger.info("─" * 60)
-            # ──────────────────────────────────────────────────────────────
-
-            payload = {
-                "logId": log_id,
-                "text": sentence,
-                "speaker": speaker,
-                "speakerConfidence": speaker_confidence,
-                "timestamp": (datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")),
-                "report": report,
-            }
-            await websocket.send_json(payload)
 
     except WebSocketDisconnect:
         # Client disconnected cleanly

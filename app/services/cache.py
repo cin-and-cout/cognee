@@ -75,7 +75,7 @@ def set_cached_verdict(text: str, report: Dict[str, Any]):
     logger.debug("Cache write", extra={"key_preview": key_preview, "cache_size": len(_cache)})
 
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         loop.run_in_executor(None, _write_cache_to_disk)
     except RuntimeError:
         # No running event loop (e.g. in a test) — fall back to synchronous write

@@ -8,6 +8,18 @@ from app.services.coreference import SpeechContext
 
 logger = logging.getLogger(__name__)
 
+# Global concurrency limit for LLM calls across ALL pipelines.
+# Prevents rate-limit storms when multiple sentences are processed in parallel.
+# With 3 concurrent pipelines × 2 LLM calls each = up to 6 calls;
+# this semaphore ensures at most 4 are in-flight simultaneously.
+_llm_semaphore: Optional[asyncio.Semaphore] = None
+
+def get_llm_semaphore() -> asyncio.Semaphore:
+    global _llm_semaphore
+    if _llm_semaphore is None:
+        _llm_semaphore = asyncio.Semaphore(4)
+    return _llm_semaphore
+
 
 def _log_ingestion_result(task: asyncio.Task) -> None:
     """Done-callback for background ingestion tasks. Logs errors without crashing."""
@@ -65,14 +77,15 @@ async def process_incoming_sentence(
     logger.info("── STAGE 1/4: Claim Extraction ──────────────────────────")
     t1 = time.perf_counter()
     try:
-        new_claim = await extract_claim_from_text(
-            text,
-            politician_name,
-            claim_date,
-            politician_party,
-            sentence_history=sentence_history,
-            speech_context=speech_context,
-        )
+        async with get_llm_semaphore():
+            new_claim = await extract_claim_from_text(
+                text,
+                politician_name,
+                claim_date,
+                politician_party,
+                sentence_history=sentence_history,
+                speech_context=speech_context,
+            )
     except AllKeysExhaustedError:
         logger.error("   ❌ Rate limit exhausted — returning rate_limited status")
         return {"pipeline_status": "rate_limited"}
@@ -137,10 +150,11 @@ async def process_incoming_sentence(
             verdict = calculate_numeric_diff(latest_historical, new_claim)
             verdict["type"] = "numeric"
         else:
-            verdict = await classify_nli_contradiction(
-                new_claim,
-                latest_historical,
-            )
+            async with get_llm_semaphore():
+                verdict = await classify_nli_contradiction(
+                    new_claim,
+                    latest_historical,
+                )
             verdict["type"] = "qualitative"
     else:
         verdict = {
