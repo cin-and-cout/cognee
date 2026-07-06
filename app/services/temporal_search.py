@@ -33,6 +33,87 @@ async def get_historical_claims(
     """
     logger.info("get_historical_claims called", extra={"topic_name": topic_name, "politician_name": politician_name})
     
+    import os
+    cognee_api_key = os.getenv("COGNEE_API_KEY")
+    if cognee_api_key:
+        import cognee
+        from cognee import SearchType
+        
+        logger.info("Cognee Cloud: Querying historical claims remotely...")
+        query = f"Claims related to topic {topic_name}"
+        if politician_name:
+            query += f" by {politician_name}"
+            
+        try:
+            results = await cognee.search(
+                query_text=query,
+                query_type=SearchType.TRIPLET_COMPLETION,
+                verbose=True
+            )
+            
+            matching_claims = []
+            for result in results:
+                data = None
+                if hasattr(result, "search_result"):
+                    data = result.search_result
+                elif isinstance(result, dict):
+                    data = result.get("search_result")
+                
+                if not data:
+                    continue
+                
+                statement = data.get("statement") or data.get("text")
+                if not statement:
+                    continue
+                
+                c_id = data.get("id")
+                c_uuid = UUID(c_id) if c_id else UUID(int=0)
+                
+                p_data = data.get("politician") or {}
+                p_name = p_data.get("name") or politician_name or "Unknown Politician"
+                politician_obj = Politician(
+                    id=UUID(p_data.get("id")) if p_data.get("id") else UUID(int=0),
+                    name=p_name,
+                    party=p_data.get("party") or None
+                )
+                
+                topic_obj = Topic(
+                    id=UUID(data.get("topic", {}).get("id")) if data.get("topic", {}).get("id") else UUID(int=0),
+                    name=data.get("topic", {}).get("name") or topic_name
+                )
+                
+                claim_obj = Claim(
+                    id=c_uuid,
+                    statement=statement,
+                    claim_date=data.get("claim_date") or "2026-07-06",
+                    source_link=data.get("source_link") or None,
+                    is_numeric=data.get("is_numeric", False),
+                    metric=data.get("metric") or None,
+                    value=data.get("value") or None,
+                    unit=data.get("unit") or None,
+                    politician=politician_obj,
+                    topic=topic_obj
+                )
+                claim_obj.politician = politician_obj
+                claim_obj.topic = topic_obj
+                
+                matching_claims.append(claim_obj)
+            
+            # Sort claims by date descending
+            def get_date(c: Claim) -> datetime:
+                try:
+                    return datetime.strptime(c.claim_date, "%Y-%m-%d")
+                except Exception:
+                    return datetime.min
+
+            matching_claims.sort(key=get_date, reverse=True)
+            logger.info("Cognee Cloud: returned matching claims", extra={"returned_count": len(matching_claims)})
+            return matching_claims
+            
+        except Exception as e:
+            logger.exception("Error querying Cognee Cloud for historical claims", exc_info=e)
+            return []
+
     global _graph_cache, _graph_cache_ts
     start_time = time.time()
     now = start_time

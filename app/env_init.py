@@ -16,6 +16,18 @@ load_dotenv()
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 logger.info(".env loaded", extra={"project_root": project_root})
 
+# Log Cognee Cloud connection status
+cognee_api_key = os.getenv("COGNEE_API_KEY")
+if cognee_api_key:
+    service_url = os.getenv("COGNEE_SERVICE_URL", "https://api.cognee.ai")
+    logger.info("Cognee Cloud configuration detected", extra={
+        "cognee_service_url": service_url,
+        "cognee_api_key_configured": True
+    })
+else:
+    logger.info("Cognee Cloud configuration not detected — running in Local mode.")
+
+
 for env_var in ["SYSTEM_ROOT_DIRECTORY", "DATA_ROOT_DIRECTORY"]:
     val = os.getenv(env_var)
     if val:

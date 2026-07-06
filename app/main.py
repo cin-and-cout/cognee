@@ -19,10 +19,34 @@ async def lifespan(app: FastAPI):
     # import, wiping our RotatingFileHandler. Force-import it here then
     # immediately re-run setup_logging() so our file handler is the last one
     # registered and survives for the duration of the process.
-    import cognee  # noqa: F401 — triggers cognee's logging setup
+    import cognee
+    
+    cognee_api_key = os.getenv("COGNEE_API_KEY")
+    if cognee_api_key:
+        service_url = os.getenv("COGNEE_SERVICE_URL", "https://api.cognee.ai")
+        logger.info("Connecting local SDK to Cognee Cloud...", extra={"url": service_url})
+        try:
+            await cognee.serve(url=service_url, api_key=cognee_api_key)
+            logger.info("Successfully connected to Cognee Cloud.")
+        except Exception as e:
+            logger.exception("Failed to connect to Cognee Cloud", exc_info=e)
+            raise e
+    else:
+        logger.info("Initializing Cognee in Local Mode (no COGNEE_API_KEY configured).")
+
     setup_logging()
     logger.info("Logging reclaimed after cognee import — file handler active", extra={"version": "1.0.0"})
+    
     yield
+    
+    if cognee_api_key:
+        logger.info("Disconnecting from Cognee Cloud...")
+        try:
+            await cognee.disconnect()
+            logger.info("Disconnected from Cognee Cloud.")
+        except Exception as e:
+            logger.warning("Error during Cognee Cloud disconnect", exc_info=e)
+
 
 
 app = FastAPI(
