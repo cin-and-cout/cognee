@@ -625,7 +625,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     _setTranscriptMode(true);
     streamBuffer.reset(); // ensure live buffer is clean
-    processFullTranscript(message.segments || []);
+    // Do not call processFullTranscript. Instead, segments are streamed in real time
+    // from content.js as CAPTION_CHUNK messages as the video plays.
 
   } else if (message.action === "DISABLE_CAPTION_SCRAPER") {
     console.log("[bg] 🔇 DISABLE_CAPTION_SCRAPER received — caption processing disabled.");
