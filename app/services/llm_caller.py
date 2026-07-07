@@ -29,7 +29,7 @@ async def acreate_structured_output_with_rotation(
     """
     attempt = 0
     try:
-        model = os.getenv("LLM_MODEL", "gemini/gemini-3.5-flash")
+        model = os.getenv("LLM_MODEL", "gemini/gemini-2.5-flash")
         while True:
             attempt += 1
             key = await llm_key_pool.next_key(wait_for_cooldown=False)
