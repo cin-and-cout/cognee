@@ -570,6 +570,56 @@
     .transcript-badge.hidden {
       display: none;
     }
+
+    .live-transcript {
+      border: 3px solid #000000;
+      background-color: #ffffff;
+      padding: 10px;
+      box-shadow: 4px 4px 0px 0px #000000;
+      margin-bottom: 14px;
+    }
+
+    .live-transcript-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #000000;
+      padding-bottom: 4px;
+    }
+
+    .live-transcript-title {
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    .live-transcript-source {
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+      background-color: #e6ffff;
+      border: 2px solid #000000;
+      padding: 2px 5px;
+      white-space: nowrap;
+    }
+
+    .live-transcript-text {
+      max-height: 138px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: bold;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .live-transcript-text.empty {
+      color: #666666;
+      font-style: italic;
+      font-weight: normal;
+    }
   </style>
 </head>
 <body>
@@ -594,6 +644,16 @@
   <!-- 11.2.e — Transcript Mode Badge (hidden by default, shown when transcript is active) -->
   <div id="transcript-mode-badge" class="transcript-badge hidden" role="status">
     Using Pre-built Transcript
+  </div>
+
+  <div class="live-transcript" aria-live="polite">
+    <div class="live-transcript-header">
+      <div class="live-transcript-title">Instant Transcript</div>
+      <div id="live-transcript-source" class="live-transcript-source">Waiting</div>
+    </div>
+    <div id="live-transcript-text" class="live-transcript-text empty">
+      Speech text will appear here as soon as captions or a transcript are captured.
+    </div>
   </div>
 
   <div class="feed-container">

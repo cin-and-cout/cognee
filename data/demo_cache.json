@@ -1,219 +1,362 @@
 {
-    "i am pleased to announce that inflation has decreased to 2.8% this month.": {
+    "breakfast is the most important meal of the day, everyone needs it.": {
         "new_claim": {
-            "statement": "Inflation has decreased to 2.8% this month.",
-            "claim_date": "2026-06-29",
-            "is_numeric": true,
-            "value": 2.8,
-            "unit": "%",
-            "metric": "inflation rate",
-            "topic": "Inflation"
-        },
-        "historical_claim": {
-            "statement": "Inflation saw a minor seasonal uptick to 3.6% last month, but the long-term trend remains positive.",
-            "claim_date": "2026-03-10",
-            "is_numeric": true,
-            "value": 3.6,
-            "unit": "%",
-            "metric": "inflation rate"
-        },
-        "verdict": {
-            "is_consistent": true,
-            "absolute_drift": 0.8,
-            "percentage_variance": 22.2,
-            "label": "Consistent with prior statements",
-            "explanation": "Stated figure of 2.8% is consistent with the decreasing trend from 3.6%.",
-            "type": "numeric"
-        }
-    },
-    "we are proposing a 1% surcharge on estates over $10 million.": {
-        "new_claim": {
-            "statement": "We are proposing a 1% surcharge on estates over $10 million.",
-            "claim_date": "2026-06-29",
+            "statement": "Breakfast is the most important meal of the day.",
+            "claim_date": "2026-07-05",
             "is_numeric": false,
             "value": null,
             "unit": null,
             "metric": null,
-            "topic": "Taxation"
+            "topic": "Nutrition"
         },
         "historical_claim": {
-            "statement": "We are exploring a temporary 1% surcharge on estates valued over $10 million to fund public education.",
-            "claim_date": "2026-04-20",
+            "statement": "Breakfast is not the most important meal of the day, and skipping it is not harmful.",
+            "claim_date": "2020-01-01",
             "is_numeric": false,
             "value": null,
             "unit": null,
             "metric": null
         },
         "verdict": {
-            "label": "Consistent with prior statements",
-            "explanation": "The proposal of a 1% surcharge on estates over $10 million is consistent with the prior statement of exploring the policy.",
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'Breakfast is the most important meal of the day.' contradicts the historical record 'Breakfast is not the most important meal of the day, and skipping it is not harmful.' (Local Heuristic Match).",
             "type": "qualitative"
-        }
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "unemployment continues to be a concern, but it has stabilized at 4.2%.": {
+    "camels store water in their humps to survive the desert.": {
         "new_claim": {
-            "statement": "Unemployment has stabilized at 4.2%.",
-            "claim_date": "2026-06-29",
-            "is_numeric": true,
-            "value": 4.2,
-            "unit": "%",
-            "metric": "unemployment rate",
-            "topic": "Unemployment"
-        },
-        "historical_claim": {
-            "statement": "Unemployment registered a slight increase to 4.3% due to seasonal contract endings.",
-            "claim_date": "2026-04-05",
-            "is_numeric": true,
-            "value": 4.3,
-            "unit": "%",
-            "metric": "unemployment rate"
-        },
-        "verdict": {
-            "is_consistent": true,
-            "absolute_drift": 0.1,
-            "percentage_variance": 2.3,
-            "label": "Consistent with prior statements",
-            "explanation": "Stated figure of 4.2% is within the acceptable 10% variance of 4.3%.",
-            "type": "numeric"
-        }
-    },
-    "i am proud to report that inflation has now dropped to 2.8% this month.": {
-        "new_claim": {
-            "statement": "Inflation has now dropped to 2.8% this month.",
-            "claim_date": "2026-06-29",
-            "is_numeric": true,
-            "value": 2.8,
-            "unit": "%",
-            "metric": "inflation rate",
-            "topic": "Inflation"
-        },
-        "historical_claim": {
-            "statement": "Inflation saw a minor seasonal uptick to 3.6% last month, but the long-term trend remains positive.",
-            "claim_date": "2026-03-10",
-            "is_numeric": true,
-            "value": 3.6,
-            "unit": "%",
-            "metric": "inflation rate"
-        },
-        "verdict": {
-            "is_consistent": true,
-            "absolute_drift": 0.8,
-            "percentage_variance": 22.2,
-            "label": "Consistent with prior statements",
-            "explanation": "Stated figure of 2.8% is consistent with the decreasing trend from 3.6%.",
-            "type": "numeric"
-        }
-    },
-    "unemployment has slightly risen to 4.5% due to seasonal adjustments.": {
-        "new_claim": {
-            "statement": "Unemployment has slightly risen to 4.5% due to seasonal adjustments.",
-            "claim_date": "2026-06-29",
-            "is_numeric": true,
-            "value": 4.5,
-            "unit": "%",
-            "metric": "unemployment rate",
-            "topic": "Unemployment"
-        },
-        "historical_claim": {
-            "statement": "Unemployment registered a slight increase to 4.3% due to seasonal contract endings.",
-            "claim_date": "2026-04-05",
-            "is_numeric": true,
-            "value": 4.3,
-            "unit": "%",
-            "metric": "unemployment rate"
-        },
-        "verdict": {
-            "is_consistent": true,
-            "absolute_drift": 0.2,
-            "percentage_variance": 4.7,
-            "label": "Consistent with prior statements",
-            "explanation": "Stated figure of 4.5% is within the acceptable 10% variance of 4.3%.",
-            "type": "numeric"
-        }
-    },
-    "we are freezing passenger fares for all public transit routes indefinitely.": {
-        "new_claim": {
-            "statement": "We are freezing passenger fares for all public transit routes indefinitely.",
-            "claim_date": "2026-06-29",
+            "statement": "Camels store water in their humps.",
+            "claim_date": "2026-07-05",
             "is_numeric": false,
             "value": null,
             "unit": null,
             "metric": null,
-            "topic": "Public Transit"
+            "topic": "Biology"
         },
         "historical_claim": {
-            "statement": "To offset inflation, we are reviewing minor ticket price adjustments for express routes.",
-            "claim_date": "2026-05-01",
+            "statement": "Camels store fat in their humps, not water.",
+            "claim_date": "2020-01-01",
             "is_numeric": false,
             "value": null,
             "unit": null,
             "metric": null
         },
         "verdict": {
-            "label": "Contradicts statement from 2026-05-01",
-            "explanation": "Freezing passenger fares indefinitely directly contradicts the decision to review ticket price adjustments to offset inflation.",
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'Camels store water in their humps.' contradicts the historical record 'Camels store fat in their humps, not water.' (Local Heuristic Match).",
             "type": "qualitative"
-        }
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "we have successfully built 12,000 affordable homes across the metropolitan area.": {
+    "humans only have five senses: sight, hearing, smell, taste, and touch.": {
         "new_claim": {
-            "statement": "We have successfully built 12,000 affordable homes across the metropolitan area.",
-            "claim_date": "2026-06-29",
+            "statement": "Humans only have five senses.",
+            "claim_date": "2026-07-05",
             "is_numeric": true,
-            "value": 12000,
-            "unit": "units",
-            "metric": "affordable housing units built",
-            "topic": "Affordable Housing"
+            "value": 5.0,
+            "unit": "senses",
+            "metric": "number of human senses",
+            "topic": "Human Senses"
         },
         "historical_claim": {
-            "statement": "We have successfully built 11,500 affordable homes across the metropolitan area.",
-            "claim_date": "2026-05-15",
+            "statement": "Humans have more than five senses, typically between nine and twenty.",
+            "claim_date": "2020-01-01",
             "is_numeric": true,
-            "value": 11500,
-            "unit": "units",
-            "metric": "affordable housing units built"
+            "value": 20.0,
+            "unit": "senses",
+            "metric": "number of human senses"
         },
         "verdict": {
-            "is_consistent": true,
-            "absolute_drift": 500,
-            "percentage_variance": 4.3,
-            "label": "Consistent with prior statements",
-            "explanation": "Stated figure of 12000 units is within the acceptable 10% variance of 11500 units.",
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "Stated figure of 5.0 senses for 'number of human senses' (on 2026-07-05) differs from earlier figure of 20.0 senses (on 2020-01-01) by an absolute drift of 15.00 senses (relative change of 75.00%).",
+            "is_consistent": false,
+            "absolute_drift": 15.0,
+            "percentage_variance": 75.0,
             "type": "numeric"
-        }
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "nation ever": {
-        "pipeline_status": "no_claim"
+    "you should pee on jellyfish stings to stop the pain.": {
+        "new_claim": {
+            "statement": "You should pee on jellyfish stings.",
+            "claim_date": "2026-07-05",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "First Aid"
+        },
+        "historical_claim": {
+            "statement": "You should not pee on jellyfish stings as it makes the sting worse.",
+            "claim_date": "2020-01-01",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'You should pee on jellyfish stings.' contradicts the historical record 'You should not pee on jellyfish stings as it makes the sting worse.' (Local Heuristic Match).",
+            "type": "qualitative"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "before has any nation celebrated so magnificent a triumph as this one, the one that we are participating in right now.": {
-        "pipeline_status": "no_claim"
+    "chameleons camouflage by changing color to match their surroundings.": {
+        "new_claim": {
+            "statement": "Chameleons camouflage by changing color to match their surroundings.",
+            "claim_date": "2026-07-05",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "Biology"
+        },
+        "historical_claim": {
+            "statement": "Chameleons change color to communicate or regulate temperature, not to match their surroundings.",
+            "claim_date": "2020-01-01",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'Chameleons camouflage by changing color to match their surroundings.' contradicts the historical record 'Chameleons change color to communicate or regulate temperature, not to match their surroundings.' (Local Heuristic Match).",
+            "type": "qualitative"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "at 250 years, america is the oldest republic on earth.": {
-        "pipeline_status": "no_claim"
+    "eating carrots will give you night vision.": {
+        "new_claim": {
+            "statement": "Carrots give you night vision.",
+            "claim_date": "2026-07-05",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "Nutrition"
+        },
+        "historical_claim": {
+            "statement": "Carrots do not give you night vision.",
+            "claim_date": "2020-01-01",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'Carrots give you night vision.' contradicts the historical record 'Carrots do not give you night vision.' (Local Heuristic Match).",
+            "type": "qualitative"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "independence, thomas jefferson. >> [cheering]": {
-        "pipeline_status": "no_claim"
+    "blood is blue inside your veins.": {
+        "new_claim": {
+            "statement": "Blood is blue inside your veins.",
+            "claim_date": "2026-07-05",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "Biology"
+        },
+        "historical_claim": {
+            "statement": "Blood is always red inside your veins, never blue.",
+            "claim_date": "2020-01-01",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'Blood is blue inside your veins.' contradicts the historical record 'Blood is always red inside your veins, never blue.' (Local Heuristic Match).",
+            "type": "qualitative"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    ">> the great emancipator and savior of our union, abraham lincoln.": {
-        "pipeline_status": "no_claim"
+    "never wake a sleepwalker, they will have a heart attack.": {
+        "new_claim": {
+            "statement": "Never wake a sleepwalker.",
+            "claim_date": "2026-07-05",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "Medicine"
+        },
+        "historical_claim": {
+            "statement": "Waking a sleepwalker is safe and does not cause a heart attack.",
+            "claim_date": "2020-01-01",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'Never wake a sleepwalker.' contradicts the historical record 'Waking a sleepwalker is safe and does not cause a heart attack.' (Local Heuristic Match).",
+            "type": "qualitative"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    ">> [cheering] >> and the man who built america into a global superpower, theodore roosevelt.": {
-        "pipeline_status": "no_claim"
+    "lightning never strikes the same place twice.": {
+        "new_claim": {
+            "statement": "Lightning never strikes the same place twice.",
+            "claim_date": "2026-07-05",
+            "is_numeric": true,
+            "value": 2.0,
+            "unit": "strikes",
+            "metric": "number of lightning strikes",
+            "topic": "Physics"
+        },
+        "historical_claim": {
+            "statement": "Lightning strikes the same place multiple times, such as the Empire State Building which is hit 25 times a year.",
+            "claim_date": "2020-01-01",
+            "is_numeric": true,
+            "value": 25.0,
+            "unit": "strikes",
+            "metric": "annual lightning strikes"
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "Stated figure of 2.0 strikes for 'annual lightning strikes' (on 2026-07-05) differs from earlier figure of 25.0 strikes (on 2020-01-01) by an absolute drift of 23.00 strikes (relative change of 92.00%).",
+            "is_consistent": false,
+            "absolute_drift": 23.0,
+            "percentage_variance": 92.0,
+            "type": "numeric"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    ">> [cheering] >> these are the men who declared the freedom, won our freedom, and saved our freedom, and secured our freedom.": {
-        "pipeline_status": "no_claim"
+    "sharks can smell a drop of blood from miles away.": {
+        "new_claim": {
+            "statement": "Sharks can smell a drop of blood from miles away.",
+            "claim_date": "2026-07-05",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "Biology"
+        },
+        "historical_claim": {
+            "statement": "Sharks cannot smell a single drop of blood from miles away.",
+            "claim_date": "2020-01-01",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'Sharks can smell a drop of blood from miles away.' contradicts the historical record 'Sharks cannot smell a single drop of blood from miles away.' (Local Heuristic Match).",
+            "type": "qualitative"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "they were men of action, men of ambition, men of daring, men of destiny, and men of truly great intelligence.": {
-        "pipeline_status": "no_claim"
+    "humans swallow eight spiders a year while sleeping.": {
+        "new_claim": {
+            "statement": "Humans swallow eight spiders a year while sleeping.",
+            "claim_date": "2026-07-05",
+            "is_numeric": true,
+            "value": 8.0,
+            "unit": "spiders",
+            "metric": "annual swallowed spiders",
+            "topic": "Biology"
+        },
+        "historical_claim": {
+            "statement": "Humans do not swallow eight spiders a year while sleeping.",
+            "claim_date": "2020-01-01",
+            "is_numeric": true,
+            "value": 0.0,
+            "unit": "spiders",
+            "metric": "annual swallowed spiders"
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "Stated figure of 8.0 spiders for 'annual swallowed spiders' (on 2026-07-05) differs from earlier figure of 0.0 spiders (on 2020-01-01) by an absolute drift of 8.00 spiders (relative change of inf%).",
+            "is_consistent": false,
+            "absolute_drift": 8.0,
+            "percentage_variance": Infinity,
+            "type": "numeric"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "above all, they were great men of history.": {
-        "pipeline_status": "no_claim"
+    "pirates made people walk the plank.": {
+        "new_claim": {
+            "statement": "Pirates made people walk the plank.",
+            "claim_date": "2026-07-05",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "History"
+        },
+        "historical_claim": {
+            "statement": "Pirates did not make people walk the plank; they usually just threw captives overboard.",
+            "claim_date": "2020-01-01",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'Pirates made people walk the plank.' contradicts the historical record 'Pirates did not make people walk the plank; they usually just threw captives overboard.' (Local Heuristic Match).",
+            "type": "qualitative"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "on the threshold of our 25th": {
-        "pipeline_status": "no_claim"
+    "you lose most body heat through your head.": {
+        "new_claim": {
+            "statement": "You lose most body heat through your head.",
+            "claim_date": "2026-07-05",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "Biology"
+        },
+        "historical_claim": {
+            "statement": "You do not lose most body heat through your head; the head only accounts for 7% to 10% of heat loss.",
+            "claim_date": "2020-01-01",
+            "is_numeric": true,
+            "value": 7.0,
+            "unit": "%",
+            "metric": "head heat loss percentage"
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'You lose most body heat through your head.' contradicts the historical record 'You do not lose most body heat through your head; the head only accounts for 7% to 10% of heat loss.' (Local Heuristic Match).",
+            "type": "qualitative"
+        },
+        "pipeline_status": "compared_skipped"
     },
-    "thank you.": {
-        "pipeline_status": "no_claim"
+    "owls are wise.": {
+        "new_claim": {
+            "statement": "Owls are wise.",
+            "claim_date": "2026-07-05",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null,
+            "topic": "Biology"
+        },
+        "historical_claim": {
+            "statement": "Owls are not wise or highly intelligent compared to other birds.",
+            "claim_date": "2020-01-01",
+            "is_numeric": false,
+            "value": null,
+            "unit": null,
+            "metric": null
+        },
+        "verdict": {
+            "label": "Contradicts statement from 2020-01-01",
+            "explanation": "The statement 'Owls are wise.' contradicts the historical record 'Owls are not wise or highly intelligent compared to other birds.' (Local Heuristic Match).",
+            "type": "qualitative"
+        },
+        "pipeline_status": "compared_skipped"
     },
     "thank you very much.": {
         "pipeline_status": "no_claim"

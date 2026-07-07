@@ -12,6 +12,9 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 // ============================================================================
 let pendingSentences = [];
 const MAX_PENDING_SENTENCES = 250; // safety cap
+const MAX_LOG_ITEMS = 250;
+const MAX_TRANSCRIPT_CHARS = 12000;
+const DEFAULT_WS_URL = "ws://localhost:8000/ws/live-speech";
 
 // ============================================================================
 // Speaker Attribution State (Milestone 13)
@@ -19,6 +22,7 @@ const MAX_PENDING_SENTENCES = 250; // safety cap
 let currentSpeaker = "Unknown Speaker";
 let speakerConfidence = "low";
 let allSpeakers = [];
+let latestTranscriptText = "";
 
 // ============================================================================
 // Milestone 11.2.b — transcriptMode flag
@@ -641,7 +645,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     currentSpeaker = "Unknown Speaker";
     speakerConfidence = "low";
     allSpeakers = [];
+    latestTranscriptText = "";
     streamBuffer.reset();
+    chrome.storage.local.set({ liveTranscript: "" });
 
   // ---------------------------------------------------------------------------
   // Milestone 11.2.e — Status query
@@ -702,7 +708,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // ---------------------------------------------------------------------------
   } else if (message.action === "CAPTION_CHUNK") {
     console.log(`[bg] 🔊 CAPTION_CHUNK received (caption mode): "${message.text}"`);
+    ensureWebSocketConnected();
     streamBuffer.addChunk(message.text, message.bufferSnapshot || "", message.speaker || null);
+
+  } else if (message.action === "LIVE_TRANSCRIPT_UPDATE") {
+    latestTranscriptText = clampTranscriptText(message.text || "");
+    chrome.storage.local.set({
+      liveTranscript: latestTranscriptText,
+      liveTranscriptSource: message.source || "captions",
+      liveTranscriptUpdatedAt: Date.now(),
+    }, () => {
+      chrome.runtime.sendMessage({ action: "LIVE_TRANSCRIPT_UPDATE" });
+    });
 
   } else if (message.action === "TRANSCRIPT_CAPTURED") {
     // Legacy: still accept pre-formed sentences (e.g., from other sources)
@@ -734,7 +751,7 @@ function connectWebSocket(url, isManual = false) {
   chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "connecting" });
 
   try {
-    socket = new WebSocket(url);
+    socket = new WebSocket(_lastWsUrl);
 
     socket.onopen = () => {
       console.log("WebSocket connected to " + url);
@@ -824,7 +841,9 @@ function disconnectWebSocket() {
     reconnectTimer = null;
   }
   streamBuffer.reset();
-  pendingSentences = []; // discard any buffered sentences on explicit disconnect
+  if (clearQueue) {
+    pendingSentences = []; // discard any buffered sentences on explicit disconnect
+  }
   chrome.storage.local.set({ isRunning: false });
   chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "disconnected" });
   abortPendingLogs();
@@ -863,6 +882,7 @@ function _attachReportToLog(text, data, attempt) {
     if (existingLog) {
       // Found — attach the report and persist
       console.log(`[bg] 🔗 _attachReportToLog: Attached report to entry (attempt ${attempt + 1}). Topic: ${data.report?.new_claim?.topic}`);
+      existingLog.pendingBackend = false;
       existingLog.report = data.report;
       if (data.speaker) existingLog.speaker = data.speaker;
       if (data.speakerConfidence) existingLog.speakerConfidence = data.speakerConfidence;
@@ -881,10 +901,11 @@ function _attachReportToLog(text, data, attempt) {
         timestamp: Date.now(), 
         text, 
         report: data.report, 
+        pendingBackend: false,
         speaker: data.speaker, 
         speakerConfidence: data.speakerConfidence 
       });
-      if (logs.length > 50) logs.shift();
+      trimLogs(logs);
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
       });
@@ -1014,6 +1035,7 @@ function handleSegmentedSentence(text, speakerOverride = null) {
     if (pendingSentences.length < MAX_PENDING_SENTENCES) {
       pendingSentences.push({ text: cleanText, speaker: finalSpeaker, confidence: speakerConfidence, logId: logId });
       console.log(`[bg] 📬 Queued sentence (${pendingSentences.length}/${MAX_PENDING_SENTENCES}): "${cleanText}"`);
+      ensureWebSocketConnected();
     } else {
       console.warn(`[bg] ⚠️  Pending queue full (${MAX_PENDING_SENTENCES}). Dropping: "${cleanText}"`);
     }
@@ -1031,9 +1053,7 @@ function handleSegmentedSentence(text, speakerOverride = null) {
         speaker: finalSpeaker,
         speakerConfidence: speakerConfidence
       });
-      if (logs.length > 50) {
-        logs.shift();
-      }
+      trimLogs(logs);
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
 
