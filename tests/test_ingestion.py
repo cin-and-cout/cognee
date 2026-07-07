@@ -9,7 +9,8 @@ from ingest_historical_data import ingest_data
 @pytest.mark.asyncio
 @patch("ingest_historical_data.add_data_points", new_callable=AsyncMock)
 @patch("ingest_historical_data.cognee.cognify", new_callable=AsyncMock)
-async def test_ingest_historical_data_success(mock_cognify, mock_add_data_points):
+@patch("ingest_historical_data.cognee.add", new_callable=AsyncMock)
+async def test_ingest_historical_data_success(mock_cognee_add, mock_cognify, mock_add_data_points):
     """
     Verifies that ingest_data correctly reads the JSON file, parses the records into
     custom Pydantic DataPoint models, links relationships, and triggers the cognify pipeline.
@@ -46,7 +47,10 @@ async def test_ingest_historical_data_success(mock_cognify, mock_add_data_points
     assert isinstance(first_claim.topic, Topic)
     assert first_claim.politician.name == "Governor Alexis Vance"
 
-    # 2. Verify cognify was called with temporal_cognify=True
+    # 2. Verify cognee.add was called
+    mock_cognee_add.assert_called_once_with("historical_claims", dataset_name="default_dataset")
+
+    # 3. Verify cognify was called with temporal_cognify=True
     mock_cognify.assert_called_once_with(temporal_cognify=True)
 
 

@@ -21,9 +21,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   chrome.storage.local.get(["wsUrl", "isRunning", "logs", "liveTranscript", "liveTranscriptSource"], (data) => {
     if (data.wsUrl) wsUrlInput.value = data.wsUrl;
-    updateUI(data.isRunning || false);
-    renderLiveTranscript(data.liveTranscript || "", data.liveTranscriptSource || "waiting");
     renderFeed(data.logs || []);
+    // Query active state from background on load
+    chrome.runtime.sendMessage({ action: "GET_CONNECTION_STATE" }, (resp) => {
+      const state = (resp && resp.state) || (data.isRunning ? "connected" : "disconnected");
+      updateUI(state);
+    });
   });
 
   // 11.2.e — Query transcript mode status on load
@@ -34,22 +37,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ============================================================================
-  // Connect / Disconnect toggle (unchanged from previous milestone)
+  // Connect / Disconnect toggle
   // ============================================================================
 
   toggleBtn.addEventListener("click", () => {
-    chrome.storage.local.get("isRunning", (data) => {
-      const nextState = !data.isRunning;
-      const wsUrl = wsUrlInput.value.trim();
-
-      chrome.storage.local.set({ wsUrl, isRunning: nextState }, () => {
-        updateUI(nextState);
-        chrome.runtime.sendMessage({
-          action: nextState ? "CONNECT" : "DISCONNECT",
-          url: wsUrl,
-        });
+    const isConnected = (statusBadge.textContent === "Active");
+    if (isConnected) {
+      chrome.storage.local.set({ isRunning: false }, () => {
+        updateUI("disconnected");
+        chrome.runtime.sendMessage({ action: "DISCONNECT" });
       });
-    });
+    } else {
+      const wsUrl = wsUrlInput.value.trim();
+      chrome.storage.local.set({ wsUrl }, () => {
+        updateUI("connecting");
+        chrome.runtime.sendMessage({ action: "CONNECT", url: wsUrl });
+      });
+    }
   });
 
   // ============================================================================
@@ -91,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === "STATUS_UPDATE") {
-      updateUI(message.isRunning);
+      updateUI(message.state);
     } else if (message.action === "NEW_LOG") {
       chrome.storage.local.get("logs", (data) => {
         renderFeed(data.logs || []);
@@ -110,17 +114,27 @@ document.addEventListener("DOMContentLoaded", () => {
   // UI helpers
   // ============================================================================
 
-  function updateUI(isRunning) {
-    if (isRunning) {
+  function updateUI(state) {
+    if (state === "connected") {
       statusBadge.textContent = "Active";
       statusBadge.className   = "badge connected";
       toggleBtn.textContent   = "Disconnect";
       toggleBtn.className     = "btn active";
+      toggleBtn.disabled      = false;
+      chrome.storage.local.set({ isRunning: true });
+    } else if (state === "connecting") {
+      statusBadge.textContent = "Connecting...";
+      statusBadge.className   = "badge rate-limit"; // orange-yellow badge style
+      toggleBtn.textContent   = "Connecting...";
+      toggleBtn.className     = "btn";
+      toggleBtn.disabled      = true;
     } else {
       statusBadge.textContent = "Inactive";
       statusBadge.className   = "badge disconnected";
       toggleBtn.textContent   = "Connect & Listen";
       toggleBtn.className     = "btn";
+      toggleBtn.disabled      = false;
+      chrome.storage.local.set({ isRunning: false });
     }
   }
 
@@ -201,6 +215,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (log.report === null) {
       // Still waiting for backend response
       badgeHtml = `<span class="verdict-badge analyzing">⏳ Analysing…</span>`;
+    } else if (log.report.pipeline_status === "rate_limited") {
+      const cooldownSec = log.report.cooldown_remaining || 60;
+      badgeHtml = `<span class="verdict-badge rate-limit">🔁 Rate Limited (${cooldownSec}s cooldown)</span>`;
+    } else if (log.report.pipeline_status === "timeout") {
+      badgeHtml = `<span class="verdict-badge error">⌛ Timed Out</span>`;
     } else if (log.report.pipeline_status === "no_claim") {
       badgeHtml = `<span class="verdict-badge no-claim">✕ Not a Valid Claim</span>`;
     } else if (log.report.pipeline_status === "added_unverified") {
@@ -209,6 +228,10 @@ document.addEventListener("DOMContentLoaded", () => {
       badgeHtml = `<span class="verdict-badge skipped">⚠ Skipped — Low Confidence</span>`;
     } else if (log.report.pipeline_status === "error") {
       badgeHtml = `<span class="verdict-badge error">⚠️ Processing Error</span>`;
+    } else if (log.report.pipeline_status === "ingest_error") {
+      badgeHtml = `<span class="verdict-badge error">⚠️ Saved — DB Error</span>`;
+    } else if (log.report.pipeline_status === "disconnected") {
+      badgeHtml = "";
     } else if (
       log.report.pipeline_status === "compared_added" ||
       log.report.pipeline_status === "compared_skipped"
@@ -256,13 +279,21 @@ document.addEventListener("DOMContentLoaded", () => {
     wrapper.appendChild(speakerBadge);
 
     // --- Per-report blocks ---
-    if (log.report && log.report.pipeline_status !== "no_claim") {
-      wrapper.appendChild(buildReportBlock(log.report));
-      if (log.pendingBackend) {
-        const pending = document.createElement("div");
-        pending.className = "log-explanation";
-        pending.textContent = "Backend verification running.";
-        wrapper.appendChild(pending);
+    if (log.report && log.report.pipeline_status !== "no_claim" && log.report.pipeline_status !== "disconnected") {
+      if (log.report.pipeline_status === "error" || log.report.pipeline_status === "rate_limited") {
+        const errorDiv = document.createElement("div");
+        errorDiv.className = "error-message";
+        errorDiv.style.fontSize = "11px";
+        errorDiv.style.color = "#ff5252";
+        errorDiv.style.fontWeight = "bold";
+        errorDiv.style.marginTop = "8px";
+        errorDiv.style.padding = "6px";
+        errorDiv.style.border = "1px solid #ff5252";
+        errorDiv.style.backgroundColor = "#ffe6e6";
+        errorDiv.textContent = log.report.error || "An unknown error occurred.";
+        wrapper.appendChild(errorDiv);
+      } else {
+        wrapper.appendChild(buildReportBlock(log.report));
       }
     }
 
@@ -422,7 +453,11 @@ document.addEventListener("DOMContentLoaded", () => {
         analyzing++;
       } else if (
         log.report.pipeline_status === "no_claim" ||
-        log.report.pipeline_status === "skipped_unverified"
+        log.report.pipeline_status === "skipped_unverified" ||
+        log.report.pipeline_status === "rate_limited" ||
+        log.report.pipeline_status === "timeout" ||
+        log.report.pipeline_status === "error" ||
+        log.report.pipeline_status === "ingest_error"
       ) {
         // not counted in the main stats
       } else if (log.report.pipeline_status === "added_unverified") {

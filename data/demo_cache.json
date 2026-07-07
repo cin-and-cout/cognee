@@ -358,29 +358,835 @@
         },
         "pipeline_status": "compared_skipped"
     },
-    "chickens can live without their heads for a few seconds.": {
+    "thank you very much.": {
+        "pipeline_status": "no_claim"
+    },
+    "yeah, that's right.": {
+        "pipeline_status": "no_claim"
+    },
+    "i should have brought michelle here, so that you could-- [cheering] this is how i'd like to be greeted when i come home.": {
+        "pipeline_status": "no_claim"
+    },
+    "but i feel like michelle's the star now, right?": {
+        "pipeline_status": "no_claim"
+    },
+    "oh, absolutely, absolutely. mr. president, welcome to the daily show. it is wonderful to see you. do you miss your name,": {
+        "pipeline_status": "no_claim"
+    },
+    "by the way? because everyone calls you mr. president, but like, i feel like i would, like if people called me like mr. daily,": {
+        "pipeline_status": "no_claim"
+    },
+    "i would miss just being called trevor.": {
+        "pipeline_status": "no_claim"
+    },
+    "do you miss your name sometimes?": {
+        "pipeline_status": "no_claim"
+    },
+    "my best friends call me barack.": {
+        "pipeline_status": "no_claim"
+    },
+    "we have reduced inflation from 8 percent to 3 percent.": {
         "new_claim": {
-            "statement": "Chickens can live without their heads for a few seconds.",
+            "statement": "We have reduced inflation from 8 percent to 3 percent.",
             "claim_date": "2026-07-05",
-            "is_numeric": false,
-            "value": null,
-            "unit": null,
-            "metric": null,
-            "topic": "Biology"
+            "is_numeric": true,
+            "value": 3.0,
+            "unit": "%",
+            "metric": "Inflation Rate",
+            "topic": "Inflation"
         },
-        "historical_claim": {
-            "statement": "Chickens cannot live without their heads, except in rare cases where the brain stem remains intact.",
-            "claim_date": "2020-01-01",
-            "is_numeric": false,
-            "value": null,
-            "unit": null,
-            "metric": null
-        },
+        "historical_claim": null,
         "verdict": {
-            "label": "Contradicts statement from 2020-01-01",
-            "explanation": "The statement 'Chickens can live without their heads for a few seconds.' contradicts the historical record 'Chickens cannot live without their heads, except in rare cases where the brain stem remains intact.' (Local Heuristic Match).",
-            "type": "qualitative"
+            "label": "No prior record",
+            "explanation": "No prior historical claims found for topic 'Inflation'.",
+            "type": "none"
         },
-        "pipeline_status": "compared_skipped"
+        "pipeline_status": "added_unverified"
+    },
+    "inflation has dropped from 9 percent to 4 percent.": {
+        "new_claim": {
+            "statement": "Inflation has dropped from 9 percent to 4 percent.",
+            "claim_date": "2026-07-05",
+            "is_numeric": true,
+            "value": 4.0,
+            "unit": "%",
+            "metric": "Inflation Rate",
+            "topic": "Inflation"
+        },
+        "historical_claim": null,
+        "verdict": {
+            "label": "No prior record",
+            "explanation": "No prior historical claims found for topic 'Inflation'.",
+            "type": "none"
+        },
+        "pipeline_status": "added_unverified"
+    },
+    "inflation now stands at 9 percent, the highest it has ever been.": {
+        "new_claim": {
+            "statement": "Inflation now stands at 9 percent, the highest it has ever been.",
+            "claim_date": "2026-07-05",
+            "is_numeric": true,
+            "value": 9.0,
+            "unit": "%",
+            "metric": "Inflation Rate",
+            "topic": "Inflation"
+        },
+        "historical_claim": null,
+        "verdict": {
+            "label": "No prior record",
+            "explanation": "No prior historical claims found for topic 'Inflation'.",
+            "type": "none"
+        },
+        "pipeline_status": "added_unverified"
+    },
+    "inflation is at 3 percent, a historic low.": {
+        "pipeline_status": "no_claim"
+    },
+    "inflation has never been higher, we are in a cost of living crisis.": {
+        "pipeline_status": "no_claim"
+    },
+    "we have built 50000 affordable housing units this year.": {
+        "pipeline_status": "no_claim"
+    },
+    "our government has reduced unemployment to just 2.1 percent.": {
+        "new_claim": {
+            "statement": "Our government has reduced unemployment to just 2.1 percent.",
+            "claim_date": "2026-07-05",
+            "is_numeric": true,
+            "value": 2.1,
+            "unit": "%",
+            "metric": "Unemployment Rate",
+            "topic": "Unemployment"
+        },
+        "historical_claim": null,
+        "verdict": {
+            "label": "No prior record",
+            "explanation": "No prior historical claims found for topic 'Unemployment'.",
+            "type": "none"
+        },
+        "pipeline_status": "added_unverified"
+    },
+    "the tax rate for middle class families has been cut from 22 percent to 18 percent.": {
+        "pipeline_status": "no_claim"
+    },
+    "breakfast is the most important meal of the day.": {
+        "pipeline_status": "no_claim"
+    },
+    "you've heard it your whole life.": {
+        "pipeline_status": "no_claim"
+    },
+    "sounds like a golden rule of health, right?": {
+        "pipeline_status": "no_claim"
+    },
+    "that line didn't come from some groundbreaking medical discovery.": {
+        "pipeline_status": "no_claim"
+    },
+    "it came from marketing.": {
+        "pipeline_status": "no_claim"
+    },
+    "back in the late 1800s, a guy named john harvey kellogg, aka the cornflakes guy, started pushing breakfast hard.": {
+        "pipeline_status": "no_claim"
+    },
+    "then in the 1900s, food companies ran with it because they were selling cereal by calling it essential.": {
+        "pipeline_status": "no_claim"
+    },
+    "it worked so well that now people think skipping breakfast is practically a crime.": {
+        "pipeline_status": "no_claim"
+    },
+    "but here's the truth.": {
+        "pipeline_status": "no_claim"
+    },
+    "science doesn't back this up.": {
+        "pipeline_status": "no_claim"
+    },
+    "eating breakfast isn't a magical key to weight loss, better focus, or a longer life.": {
+        "pipeline_status": "no_claim"
+    },
+    "studies show what really matters is your overall diet and lifestyle.": {
+        "pipeline_status": "no_claim"
+    },
+    "not whether you ate eggs at 8:00 a.m.": {
+        "pipeline_status": "no_claim"
+    },
+    "some people genuinely feel great eating first thing in the morning.": {
+        "pipeline_status": "no_claim"
+    },
+    "others feel sluggish and prefer to wait.": {
+        "pipeline_status": "no_claim"
+    },
+    "intermittent fasting is literally the act of entirely skipping breakfast.": {
+        "pipeline_status": "no_claim"
+    },
+    "and lots of people around the world thrive on that.": {
+        "pipeline_status": "no_claim"
+    },
+    "your body runs on energy from the food you've eaten over time, not the clock.": {
+        "pipeline_status": "no_claim"
+    },
+    "if not, then just skip it.": {
+        "pipeline_status": "no_claim"
+    },
+    "if you're hungry in the morning, eat.": {
+        "pipeline_status": "no_claim"
+    },
+    "camels store water in their humps.": {
+        "pipeline_status": "no_claim"
+    },
+    "everyone pictures camels as walking cantens, storing gallons of water in those big humps on their backs.": {
+        "pipeline_status": "no_claim"
+    },
+    "a desert animal, a giant hump, must be a water tank.": {
+        "pipeline_status": "no_claim"
+    },
+    "but here's the reality.": {
+        "pipeline_status": "no_claim"
+    },
+    "camels store up to 80 lbs of fat in there, and that's their energy reserve.": {
+        "pipeline_status": "no_claim"
+    },
+    "those humps are made of fat, not water.": {
+        "pipeline_status": "no_claim"
+    },
+    "it's like their portable snack bar.": {
+        "pipeline_status": "no_claim"
+    },
+    "when food is scarce, they burn that fat to survive.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, if the hump is fat and not water, where does the water thing come from?": {
+        "pipeline_status": "no_claim"
+    },
+    "camels are just insanely good at managing hydration.": {
+        "pipeline_status": "no_claim"
+    },
+    "they can drink an unbelievable amount when they find water, up to 40 gallons in one go, and then go for weeks without another sip.": {
+        "pipeline_status": "no_claim"
+    },
+    "their bodies are masters of conservation.": {
+        "pipeline_status": "no_claim"
+    },
+    "their red blood cells are ovalshaped, so blood keeps flowing even when water is low.": {
+        "pipeline_status": "no_claim"
+    },
+    "they're built for desert survival.": {
+        "pipeline_status": "no_claim"
+    },
+    "and they can let their body temperature fluctuate, so they don't sweat as much.": {
+        "pipeline_status": "no_claim"
+    },
+    "but water in the hump?": {
+        "pipeline_status": "no_claim"
+    },
+    "humans only have five senses.": {
+        "pipeline_status": "no_claim"
+    },
+    "that's pure hollywood fantasy.": {
+        "pipeline_status": "no_claim"
+    },
+    "you've probably heard this since kindergarten.": {
+        "pipeline_status": "no_claim"
+    },
+    "humans have five senses: sight, hearing, smell, taste, and touch.": {
+        "pipeline_status": "no_claim"
+    },
+    "but it's way off.": {
+        "pipeline_status": "no_claim"
+    },
+    "the idea of five senses goes all the way back to aristotle, and we've just been repeating it ever since.": {
+        "pipeline_status": "no_claim"
+    },
+    "on top of the big five, you've got balance, called the vestibular sense, which keeps you from falling over every time you stand up.": {
+        "pipeline_status": "no_claim"
+    },
+    "in reality, scientists have identified at least nine senses, and some say over 20.": {
+        "pipeline_status": "no_claim"
+    },
+    "then there's proprioception, your body's awareness of where your limbs are without looking.": {
+        "pipeline_status": "no_claim"
+    },
+    "ever touch your nose with your eyes closed?": {
+        "pipeline_status": "no_claim"
+    },
+    "you also have thermosception, sensing heat and cold, no sception for pain, and even introsception, which tells you things like when you're hungry or need to breathe.": {
+        "pipeline_status": "no_claim"
+    },
+    "if we only had five senses, walking in a straight line or even staying alive would be a nightmare.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, next time someone says humans have five senses, tell them they forgot at least four more.": {
+        "pipeline_status": "no_claim"
+    },
+    "and that's being generous.": {
+        "pipeline_status": "no_claim"
+    },
+    "you should pee on jellyfish stings.": {
+        "pipeline_status": "no_claim"
+    },
+    "maybe you've done it, or maybe you've seen it in movies.": {
+        "pipeline_status": "no_claim"
+    },
+    "someone gets stung by a jellyfish and their friend steps up with the ultimate survival move. pee on the sting.": {
+        "pipeline_status": "no_claim"
+    },
+    "hollywood makes it look like a cure, but in reality, it can make things worse.": {
+        "pipeline_status": "no_claim"
+    },
+    "jellyfish stings come from tiny venomfilled cells called pneumaticists.": {
+        "pipeline_status": "no_claim"
+    },
+    "when they fire, they inject venom into your skin.": {
+        "pipeline_status": "no_claim"
+    },
+    "and some of these stingers can stick around, loaded and ready to go.": {
+        "pipeline_status": "no_claim"
+    },
+    "the last thing you want is to trigger them again.": {
+        "pipeline_status": "no_claim"
+    },
+    "depending on its salt concentration and temperature, it can actually cause those cells to release more venom.": {
+        "pipeline_status": "no_claim"
+    },
+    "and guess what urine can do?": {
+        "pipeline_status": "no_claim"
+    },
+    "so, congratulations. is you've just been peed on and it now hurts more.": {
+        "pipeline_status": "no_claim"
+    },
+    "and then soak the area in hot water.": {
+        "pipeline_status": "no_claim"
+    },
+    "the real fix, rinse with sea water, not fresh water, because that also makes the stingers fire.": {
+        "pipeline_status": "no_claim"
+    },
+    "heat helps break down the toxins and calm the pain.": {
+        "pipeline_status": "no_claim"
+    },
+    "or if you've got it, vinegar works for certain species.": {
+        "pipeline_status": "no_claim"
+    },
+    "so next time you're at the beach and someone gets stung, skip the hero pee moment.": {
+        "pipeline_status": "no_claim"
+    },
+    "or once you've stepped up and done it, you can tell them it was actually pointless.": {
+        "pipeline_status": "no_claim"
+    },
+    "chameleons don't try to camouflage.": {
+        "pipeline_status": "no_claim"
+    },
+    "everyone thinks chameleons can just go invisible when they feel like it, blending into any background like some reptile magician.": {
+        "pipeline_status": "no_claim"
+    },
+    "green jungle, they turn green.": {
+        "pipeline_status": "no_claim"
+    },
+    "sandy desert, they go tan.": {
+        "pipeline_status": "no_claim"
+    },
+    "sounds cool, but it's mostly a myth.": {
+        "pipeline_status": "no_claim"
+    },
+    "chameleons don't change color to vanish into the scenery.": {
+        "pipeline_status": "no_claim"
+    },
+    "they do it to communicate and regulate temperature.": {
+        "pipeline_status": "no_claim"
+    },
+    "feeling aggressive, bright colors, relaxed, duller shades. hot and need to cool down.": {
+        "pipeline_status": "no_claim"
+    },
+    "those dramatic color shifts are basically just visual moods.": {
+        "pipeline_status": "no_claim"
+    },
+    "they lighten up to reflect heat.": {
+        "pipeline_status": "no_claim"
+    },
+    "their skin is packed with special cells called chromataphores and nano crystals that reflect light differently depending on how they expand or contract.": {
+        "pipeline_status": "no_claim"
+    },
+    "how do they pull it off?": {
+        "pipeline_status": "no_claim"
+    },
+    "they go darker to soak up warmth.": {
+        "pipeline_status": "no_claim"
+    },
+    "sure, they might match some natural colors by coincidence, but they're not out here repainting themselves in order to blend in and become invisible.": {
+        "pipeline_status": "no_claim"
+    },
+    "this creates everything from subtle shade shifts to full-on rainbow displays.": {
+        "pipeline_status": "no_claim"
+    },
+    "but blending in like a perfect camouflage ninja, that's hollywood magic.": {
+        "pipeline_status": "no_claim"
+    },
+    "carrots give you night vision.": {
+        "pipeline_status": "no_claim"
+    },
+    "eat your carrots and you'll be able to see in the dark.": {
+        "pipeline_status": "no_claim"
+    },
+    "you've heard this one forever.": {
+        "pipeline_status": "no_claim"
+    },
+    "sadly, it's pure myth with a little history twist.": {
+        "pipeline_status": "no_claim"
+    },
+    "but does it give you night vision powers?": {
+        "pipeline_status": "no_claim"
+    },
+    "carrots do have beta carotene, which your body turns into vitamin a, and vitamin a is crucial for healthy eyes.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, where did this myth come from?": {
+        "pipeline_status": "no_claim"
+    },
+    "blame world war ii propaganda.": {
+        "pipeline_status": "no_claim"
+    },
+    "if you're severely deficient in vitamin a, carrots will help restore normal vision, but they won't turn you into a nocturnal predator.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, they claimed their pilots had super night vision because they ate tons of carrots.": {
+        "pipeline_status": "no_claim"
+    },
+    "the british royal air force had radar tech that let them spot enemy planes at night, but they didn't want germany to know.": {
+        "pipeline_status": "no_claim"
+    },
+    "the story spread like wildfire, and people still believe it today.": {
+        "pipeline_status": "no_claim"
+    },
+    "the only thing carrots give you at night is orange teeth.": {
+        "pipeline_status": "no_claim"
+    },
+    "blood is blue inside your veins.": {
+        "pipeline_status": "no_claim"
+    },
+    "carrots are great for you, but if you're hoping to ditch your headlights after a few carrots, forget it.": {
+        "pipeline_status": "no_claim"
+    },
+    "you probably heard someone say, \"your blood is blue until it hits the air.\" makes sense if you've ever looked at your veins.": {
+        "pipeline_status": "no_claim"
+    },
+    "they look blue, right?": {
+        "pipeline_status": "no_claim"
+    },
+    "human blood is never blue.": {
+        "pipeline_status": "no_claim"
+    },
+    "bright red when it's loaded with oxygen, darker red when it's carrying less.": {
+        "pipeline_status": "no_claim"
+    },
+    "not in your veins, not in your heart, not anywhere.": {
+        "pipeline_status": "no_claim"
+    },
+    "it's always red, just different shades depending on oxygen levels.": {
+        "pipeline_status": "no_claim"
+    },
+    "that's an optical illusion caused by how light penetrates your skin and bounces back.": {
+        "pipeline_status": "no_claim"
+    },
+    "blue light has a shorter wavelength, so it scatters more easily than red light, making veins appear bluish under the skin.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, why do your veins look blue?": {
+        "pipeline_status": "no_claim"
+    },
+    "the blue blood idea got so popular that some people even think your blood turns red only when it touches oxygen.": {
+        "pipeline_status": "no_claim"
+    },
+    "this rumor may also be due to some animals like horseshoe crabs that actually do have blue blood.": {
+        "pipeline_status": "no_claim"
+    },
+    "cut yourself and you don't see a color change because it was already red.": {
+        "pipeline_status": "no_claim"
+    },
+    "but humans, we're stuck with red.": {
+        "pipeline_status": "no_claim"
+    },
+    "blue blood royalty, that's just a metaphor.": {
+        "pipeline_status": "no_claim"
+    },
+    "never wake a sleepwalker.": {
+        "pipeline_status": "no_claim"
+    },
+    "it's dangerous.\" the story goes that if you wake them, they'll have a heart attack, go into shock, or lose their mind forever.": {
+        "pipeline_status": "no_claim"
+    },
+    "if you've ever seen someone sleepwalk, you've probably heard, \"don't wake them.": {
+        "pipeline_status": "no_claim"
+    },
+    "sounds terrifying, but it's pure myth.": {
+        "pipeline_status": "no_claim"
+    },
+    "waking up a sleepwalker won't kill them.": {
+        "pipeline_status": "no_claim"
+    },
+    "sleepwalking happens during deep sleep, so when you wake them, their brain is basically rebooting.": {
+        "pipeline_status": "no_claim"
+    },
+    "it might confuse or startle them, but that's about it.": {
+        "pipeline_status": "no_claim"
+    },
+    "they'll probably be groggy and have no idea what's going on, but they'll survive just fine.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, where did this idea come from?": {
+        "pipeline_status": "no_claim"
+    },
+    "mostly old superstitions and fear of messing with sleep because sleep has always seemed mysterious and sacred.": {
+        "pipeline_status": "no_claim"
+    },
+    "the real danger isn't waking them, it's letting them roam.": {
+        "pipeline_status": "no_claim"
+    },
+    "sleepwalkers can do some pretty risky things.": {
+        "pipeline_status": "no_claim"
+    },
+    "wander outside, climb stairs, even drive cars in rare cases.": {
+        "pipeline_status": "no_claim"
+    },
+    "that's where people get hurt.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, the best move, gently guide them back to bed if you can.": {
+        "pipeline_status": "no_claim"
+    },
+    "if that's not possible, just wake them.": {
+        "pipeline_status": "no_claim"
+    },
+    "lightning never strikes the same place twice.": {
+        "pipeline_status": "no_claim"
+    },
+    "sounds dramatic, like nature's got a rule book.": {
+        "pipeline_status": "no_claim"
+    },
+    "you've probably heard this one as a metaphor for rare events.": {
+        "pipeline_status": "no_claim"
+    },
+    "lightning doesn't care about sayings.": {
+        "pipeline_status": "no_claim"
+    },
+    "it absolutely strikes the same place over and over.": {
+        "pipeline_status": "no_claim"
+    },
+    "in fact, tall structures like skyscrapers, radio towers, and even trees are magnets for lightning.": {
+        "pipeline_status": "no_claim"
+    },
+    "the empire state building gets hit about 20 to 25 times every single year.": {
+        "pipeline_status": "no_claim"
+    },
+    "and a big metal tower sticking into the sky is basically an invitation.": {
+        "pipeline_status": "no_claim"
+    },
+    "because lightning takes the path of least resistance.": {
+        "pipeline_status": "no_claim"
+    },
+    "so the next time someone drops that phrase, remember lightning's not picky.": {
+        "pipeline_status": "no_claim"
+    },
+    "sharks can smell a drop of blood from miles away.": {
+        "pipeline_status": "no_claim"
+    },
+    "if you're standing in the wrong spot during a storm, it might strike you twice just to prove a point.": {
+        "pipeline_status": "no_claim"
+    },
+    "you've seen this scene in every shark movie.": {
+        "pipeline_status": "no_claim"
+    },
+    "one tiny drop of blood hits the water and miles away, a great white goes into a frenzy, zeroing in like it has some sort of gps.": {
+        "pipeline_status": "no_claim"
+    },
+    "but in reality, that's hollywood drama, not science.": {
+        "pipeline_status": "no_claim"
+    },
+    "sharks do have an amazing sense of smell, one of the best in the animal kingdom.": {
+        "pipeline_status": "no_claim"
+    },
+    "but the whole miles away idea is massively overblown.": {
+        "pipeline_status": "no_claim"
+    },
+    "in truth, they can detect blood at concentrations of about one part per million.": {
+        "pipeline_status": "no_claim"
+    },
+    "that's insanely good, but it translates to something like a drop of blood in an olympiciz swimming pool, not the entire ocean.": {
+        "pipeline_status": "no_claim"
+    },
+    "and even then, currents, tides, and water movement scatter scent quickly.": {
+        "pipeline_status": "no_claim"
+    },
+    "if you cut your finger in hawaii, a shark in california isn't coming for you.": {
+        "pipeline_status": "no_claim"
+    },
+    "they're impressive predators, but they're not horror movie level.": {
+        "pipeline_status": "no_claim"
+    },
+    "still, probably don't test this by bleeding in the water, because if a shark's nearby, it's definitely going to notice.": {
+        "pipeline_status": "no_claim"
+    },
+    "humans swallow eight spiders a year while sleeping.": {
+        "pipeline_status": "no_claim"
+    },
+    "you've probably heard this creepy fact.": {
+        "pipeline_status": "no_claim"
+    },
+    "every year while you sleep, eight spiders crawl into your mouth.": {
+        "pipeline_status": "no_claim"
+    },
+    "midream and a spider decides to crawl in your open mouth or down one of your nostrils.": {
+        "pipeline_status": "no_claim"
+    },
+    "it sneaks past your lips, sets up camp, and disappears forever.": {
+        "pipeline_status": "no_claim"
+    },
+    "spiders don't want to go anywhere near your mouth.": {
+        "pipeline_status": "no_claim"
+    },
+    "good news, it's total nonsense.": {
+        "pipeline_status": "no_claim"
+    },
+    "warm, wet, vibrating, and full of teeth.": {
+        "pipeline_status": "no_claim"
+    },
+    "the vibrations of your breathing, your snoring, even your heartbeat send them running the other way.": {
+        "pipeline_status": "no_claim"
+    },
+    "that's basically their worst nightmare.": {
+        "pipeline_status": "no_claim"
+    },
+    "they hunt where it's quiet and still, not on top of a snoring giant who might squish them at any second.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, where did this nightmare come from?": {
+        "pipeline_status": "no_claim"
+    },
+    "the reason that the average human swallows eight a year is because one guy is skewing the odds and eating 64 billion to mess with the rest of us.": {
+        "pipeline_status": "no_claim"
+    },
+    "in reality, the odds of swallowing even one spider in your life are microscopic.": {
+        "pipeline_status": "no_claim"
+    },
+    "unless you're doing it on purpose, so relax.": {
+        "pipeline_status": "no_claim"
+    },
+    "there's nothing sneaking into your mouth at night unless you're that one guy.": {
+        "pipeline_status": "no_claim"
+    },
+    "pirates made people walk the plank.": {
+        "pipeline_status": "no_claim"
+    },
+    "every pirate movie has it.": {
+        "pipeline_status": "no_claim"
+    },
+    "the dramatic moment where the villain waves a sword and snarls, \"walk the plank.\" the crew gathers, they beat the drums, and the victim does that slow, trembling tiptoe toward the edge.": {
+        "pipeline_status": "no_claim"
+    },
+    "he splashes into the sharkinfested waters while everyone cheers.": {
+        "pipeline_status": "no_claim"
+    },
+    "historical records show little to no evidence of real pirates using this method.": {
+        "pipeline_status": "no_claim"
+    },
+    "it's iconic, but almost entirely fake.": {
+        "pipeline_status": "no_claim"
+    },
+    "because pirates weren't putting on broadway shows.": {
+        "pipeline_status": "no_claim"
+    },
+    "they were running a business.": {
+        "pipeline_status": "no_claim"
+    },
+    "time was money, and forcing someone to balance on a board was just unnecessary.": {
+        "pipeline_status": "no_claim"
+    },
+    "if they wanted you gone, they'd toss you overboard, stab you, or ransom you.": {
+        "pipeline_status": "no_claim"
+    },
+    "fast, simple, and terrifying in its own way.": {
+        "pipeline_status": "no_claim"
+    },
+    "walking the plank didn't really pop up until the 19th century in literature and stage plays, and then hollywood ran wild with it.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, the truth, you weren't taking a theatrical stroll to your death.": {
+        "pipeline_status": "no_claim"
+    },
+    "you were getting shoved or shanked, then shoved.": {
+        "pipeline_status": "no_claim"
+    },
+    "less cinematic, but the outcome was the same.": {
+        "pipeline_status": "no_claim"
+    },
+    "you lose most body heat through your head.": {
+        "pipeline_status": "no_claim"
+    },
+    "you've probably heard this one from every parent ever.": {
+        "pipeline_status": "no_claim"
+    },
+    "wear a hat or you'll freeze.": {
+        "pipeline_status": "no_claim"
+    },
+    "most of your body heat escapes through your head.": {
+        "pipeline_status": "no_claim"
+    },
+    "it even sounds scientific, like your head is some kind of chimney that blasts heat into the cold winter air.": {
+        "pipeline_status": "no_claim"
+    },
+    "but it's a myth born from bad science.": {
+        "pipeline_status": "no_claim"
+    },
+    "the idea came from a 1950s military experiment where soldiers in freezing conditions wore winter gear except on their heads.": {
+        "pipeline_status": "no_claim"
+    },
+    "that was the only bare skin exposed.": {
+        "pipeline_status": "no_claim"
+    },
+    "of course, they lost more heat there.": {
+        "pipeline_status": "no_claim"
+    },
+    "the truth is, heat escapes from any uncovered skin, and it's proportional to the surface area.": {
+        "pipeline_status": "no_claim"
+    },
+    "your head is only about 10% of your body.": {
+        "pipeline_status": "no_claim"
+    },
+    "so, unless you're some kind of giant floating head, it's not where you're losing most of your warmth.": {
+        "pipeline_status": "no_claim"
+    },
+    "if you went outside naked wearing just a hat, you'd still freeze in minutes.": {
+        "pipeline_status": "no_claim"
+    },
+    "of course, a hat still helps in winter, but so do pants, gloves, socks, and literally anything else covering your skin.": {
+        "pipeline_status": "no_claim"
+    },
+    "if you want to stay warm, dress like a human.": {
+        "pipeline_status": "no_claim"
+    },
+    "owls have been the animal symbol for wisdom forever.": {
+        "pipeline_status": "no_claim"
+    },
+    "ancient greece made them athena's mascot.": {
+        "pipeline_status": "no_claim"
+    },
+    "story books give them glasses and cartoons treat them like professors.": {
+        "pipeline_status": "no_claim"
+    },
+    "they're perched on the shoulders of wizards dishing out advice in magical forests.": {
+        "pipeline_status": "no_claim"
+    },
+    "and for centuries, we've treated them like nature's philosophers.": {
+        "pipeline_status": "no_claim"
+    },
+    "but in reality, owls aren't the geniuses of the bird world.": {
+        "pipeline_status": "no_claim"
+    },
+    "they're more like the strong, silent type.": {
+        "pipeline_status": "no_claim"
+    },
+    "yes, they're incredible hunters, but that's instinct, not iq.": {
+        "pipeline_status": "no_claim"
+    },
+    "compare them to crows or ravens, which can solve puzzles, recognize human faces, and even use tools.": {
+        "pipeline_status": "no_claim"
+    },
+    "they're knight assassins, not professors.": {
+        "pipeline_status": "no_claim"
+    },
+    "and owls look kind of clueless.": {
+        "pipeline_status": "no_claim"
+    },
+    "owls, they just sit there looking mysterious.": {
+        "pipeline_status": "no_claim"
+    },
+    "crows can drop nuts on crosswalks, so cars crack them open.": {
+        "pipeline_status": "no_claim"
+    },
+    "their huge eyes and fixed stare make them seem deep and thoughtful.": {
+        "pipeline_status": "no_claim"
+    },
+    "so next time you see an owl staring into the distance, it's not thinking about life's big questions.": {
+        "pipeline_status": "no_claim"
+    },
+    "but that's just biology, not them being all deep.": {
+        "pipeline_status": "no_claim"
+    },
+    "it's thinking mouse or frog.": {
+        "pipeline_status": "no_claim"
+    },
+    "chickens can live without their heads for a few seconds.": {
+        "pipeline_status": "no_claim"
+    },
+    "everyone knows the phrase running around like a headless chicken, but most people think the story ends in seconds.": {
+        "pipeline_status": "no_claim"
+    },
+    "you chop off the head, a little flapping, and then done.": {
+        "pipeline_status": "no_claim"
+    },
+    "but the truth is way stranger.": {
+        "pipeline_status": "no_claim"
+    },
+    "sometimes that headless chicken doesn't just twitch.": {
+        "pipeline_status": "no_claim"
+    },
+    "it keeps on living.": {
+        "pipeline_status": "no_claim"
+    },
+    "not for seconds, not even for minutes, but for hours.": {
+        "pipeline_status": "no_claim"
+    },
+    "in one famous case from 1945, a chicken named mike lived for 18 months after losing his head.": {
+        "pipeline_status": "no_claim"
+    },
+    "how is that even possible?": {
+        "pipeline_status": "no_claim"
+    },
+    "turns out the brain stem, which controls basic life functions like breathing and heartbeat, can stay intact if the cut is high enough.": {
+        "pipeline_status": "no_claim"
+    },
+    "so mike's body just kept going.": {
+        "pipeline_status": "no_claim"
+    },
+    "farmers fed him through an eyropper straight into his throat, and he became a national celebrity, traveling the us as the headless wonder chicken.": {
+        "pipeline_status": "no_claim"
+    },
+    "you're looking at a chicken with no face, no eyes, no beak, just a body and a pulse.": {
+        "pipeline_status": "no_claim"
+    },
+    "think about that for a second.": {
+        "pipeline_status": "no_claim"
+    },
+    "could he feel anything?": {
+        "pipeline_status": "no_claim"
+    },
+    "or was it pure instinct driving him on?": {
+        "pipeline_status": "no_claim"
+    },
+    "scientists aren't sure, and honestly, i couldn't tell you either.": {
+        "pipeline_status": "no_claim"
+    },
+    "i hope you enjoyed this video.": {
+        "pipeline_status": "no_claim"
+    },
+    "please give me video ideas you want to see in the comments.": {
+        "pipeline_status": "no_claim"
+    },
+    "sounds logical, right? a desert animal, a giant hump, must be a water tank. but here's the reality. those humps are made of fat, not water. camels store up to 80 lbs of fat in there, and that's their energy reserve. it's like their portable snack bar. when food is scarce, they burn that fat to survive. so, if the hump is fat and not water, where does the water thing come from? camels are just insanely good at managing hydration. they can drink an unbelievable amount when they find water, up to 40 gallons in one go, and then go for weeks without another sip. their bodies are masters of conservation. their red blood cells are ovalshaped, so blood keeps flowing even when water is low. and they can let their body temperature fluctuate, so they don't sweat as much. they're built for desert survival. but water in the hump? that's pure hollywood fantasy. humans only have five senses. you've probably heard this since kindergarten. humans have five senses: sight, hearing, smell, taste, and touch. sounds normal, right? but it's way off. the idea of five senses goes all the way back to aristotle, and we've just been repeating it ever since. in reality, scientists have identified at least nine senses, and some say over 20. on top of the big five, you've got balance, called the vestibular sense, which keeps you from falling over every time you stand up. then there's proprioception, your body's awareness of where your limbs are without looking. ever touch your nose with your eyes closed? that's propriception. you also have thermosception, sensing heat and cold, no sception for pain, and even introsception, which tells you things like when you're hungry or need to breathe. if we only had five senses, walking in a straight line or even staying alive would be a nightmare. so, next time someone says humans have five senses, tell them they forgot at least four more. and that's being generous. you should pee on jellyfish stings. maybe you've done it, or maybe you've seen it in movies. someone gets stung by a jellyfish and their friend steps up with the ultimate survival move. pee on the sting. hollywood makes it look like a cure, but in reality, it can make things worse. here's why. jellyfish stings come from tiny venomfilled cells called pneumaticists. when they fire, they inject venom into your skin. and some of these stingers can stick around, loaded and ready to go. the last thing you want is to trigger them again. and guess what urine can do? depending on its salt concentration and temperature, it can actually cause those cells to release more venom. so, congratulations. is you've just been peed on and it now hurts more. the real fix, rinse with sea water, not fresh water, because that also makes the stingers fire. and then soak the area in hot water. heat helps break down the toxins and calm the pain. or if you've got it, vinegar works for certain species. so next time you're at the beach and someone gets stung, skip the hero pee moment. or once you've stepped up and done it, you can tell them it was actually pointless. chameleons don't try to camouflage. everyone thinks chameleons can just go invisible when they feel like it, blending into any background like some reptile magician. green jungle, they turn green. sandy desert, they go tan. sounds cool, but it's mostly a myth. chameleons don't change color to vanish into the scenery. they do it to communicate and regulate temperature. those dramatic color shifts are basically just visual moods. feeling aggressive, bright colors, relaxed, duller shades. hot and need to cool down. they lighten up to reflect heat. cold? they go darker to soak up warmth. how do they pull it off? their skin is packed with special cells called chromataphores and nano crystals that reflect light differently depending on how they expand or contract. this creates everything from subtle shade shifts to full-on rainbow displays. but blending in like a perfect camouflage ninja, that's hollywood magic. sure, they might match some natural colors by coincidence, but they're not out here repainting themselves in order to blend in and become invisible. carrots give you night vision. you've heard this one forever. eat your carrots and you'll be able to see in the dark. sounds awesome, right? sadly, it's pure myth with a little history twist. carrots do have beta carotene, which your body turns into vitamin a, and vitamin a is crucial for healthy eyes. but does it give you night vision powers? not even close. if you're severely deficient in vitamin a, carrots will help restore normal vision, but they won't turn you into a nocturnal predator. so, where did this myth come from? blame world war ii propaganda. the british royal air force had radar tech that let them spot enemy planes at night, but they didn't want germany to know. so, they claimed their pilots had super night vision because they ate tons of carrots. the story spread like wildfire, and people still believe it today. carrots are great for you, but if you're hoping to ditch your headlights after a few carrots, forget it. the only thing carrots give you at night is orange teeth. blood is blue inside your veins. you probably heard someone say, \"your blood is blue until it hits the air.\" makes sense if you've ever looked at your veins. they look blue, right? but here's the truth. human blood is never blue. not in your veins, not in your heart, not anywhere. it's always red, just different shades depending on oxygen levels. bright red when it's loaded with oxygen, darker red when it's carrying less. so, why do your veins look blue? that's an optical illusion caused by how light penetrates your skin and bounces back. blue light has a shorter wavelength, so it scatters more easily than red light, making veins appear bluish under the skin. the blue blood idea got so popular that some people even think your blood turns red only when it touches oxygen. nope. cut yourself and you don't see a color change because it was already red. this rumor may also be due to some animals like horseshoe crabs that actually do have blue blood. but humans, we're stuck with red. blue blood royalty, that's just a metaphor. never wake a sleepwalker. if you've ever seen someone sleepwalk, you've probably heard, \"don't wake them. it's dangerous.\" the story goes that if you wake them, they'll have a heart attack, go into shock, or lose their mind forever. sounds terrifying, but it's pure myth. waking up a sleepwalker won't kill them. it might confuse or startle them, but that's about it. sleepwalking happens during deep sleep, so when you wake them, their brain is basically rebooting. they'll probably be groggy and have no idea what's going on, but they'll survive just fine. so, where did this idea come from? mostly old superstitions and fear of messing with sleep because sleep has always seemed mysterious and sacred. the real danger isn't waking them, it's letting them roam. sleepwalkers can do some pretty risky things. wander outside, climb stairs, even drive cars in rare cases. that's where people get hurt. so, the best move, gently guide them back to bed if you can. if that's not possible, just wake them. lightning never strikes the same place twice. you've probably heard this one as a metaphor for rare events. lightning never strikes the same place twice. sounds dramatic, like nature's got a rule book. but here's the truth. lightning doesn't care about sayings. it absolutely strikes the same place over and over. in fact, tall structures like skyscrapers, radio towers, and even trees are magnets for lightning. the empire state building gets hit about 20 to 25 times every single year. why? because lightning takes the path of least resistance. and a big metal tower sticking into the sky is basically an invitation. so the next time someone drops that phrase, remember lightning's not picky. if you're standing in the wrong spot during a storm, it might strike you twice just to prove a point. sharks can smell a drop of blood from miles away. you've seen this scene in every shark movie. one tiny drop of blood hits the water and miles away, a great white goes into a frenzy, zeroing in like it has some sort of gps. sounds terrifying, right? but in reality, that's hollywood drama, not science. sharks do have an amazing sense of smell, one of the best in the animal kingdom. but the whole miles away idea is massively overblown. in truth, they can detect blood at concentrations of about one part per million. that's insanely good, but it translates to something like a drop of blood in an olympiciz swimming pool, not the entire ocean. and even then, currents, tides, and water movement scatter scent quickly. so, no. if you cut your finger in hawaii, a shark in california isn't coming for you. they're impressive predators, but they're not horror movie level. still, probably don't test this by bleeding in the water, because if a shark's nearby, it's definitely going to notice. humans swallow eight spiders a year while sleeping. you've probably heard this creepy fact. every year while you sleep, eight spiders crawl into your mouth. picture that. midream and a spider decides to crawl in your open mouth or down one of your nostrils. it sneaks past your lips, sets up camp, and disappears forever. terrifying, right? good news, it's total nonsense. spiders don't want to go anywhere near your mouth. think about it. warm, wet, vibrating, and full of teeth. that's basically their worst nightmare. the vibrations of your breathing, your snoring, even your heartbeat send them running the other way. they hunt where it's quiet and still, not on top of a snoring giant who might squish them at any second. so, where did this nightmare come from? the reason that the average human swallows eight a year is because one guy is skewing the odds and eating 64 billion to mess with the rest of us. in reality, the odds of swallowing even one spider in your life are microscopic. unless you're doing it on purpose, so relax. there's nothing sneaking into your mouth at night unless you're that one guy. pirates made people walk the plank. every pirate movie has it. the dramatic moment where the villain waves a sword and snarls, \"walk the plank.\" the crew gathers, they beat the drums, and the victim does that slow, trembling tiptoe toward the edge. he splashes into the sharkinfested waters while everyone cheers. it's iconic, but almost entirely fake. historical records show little to no evidence of real pirates using this method. why? because pirates weren't putting on broadway shows. they were running a business. time was money, and forcing someone to balance on a board was just unnecessary. if they wanted you gone, they'd toss you overboard, stab you, or ransom you. fast, simple, and terrifying in its own way. walking the plank didn't really pop up until the 19th century in literature and stage plays, and then hollywood ran wild with it. so, the truth, you weren't taking a theatrical stroll to your death. you were getting shoved or shanked, then shoved. less cinematic, but the outcome was the same. you lose most body heat through your head. you've probably heard this one from every parent ever. wear a hat or you'll freeze. most of your body heat escapes through your head. sounds legit, right? it even sounds scientific, like your head is some kind of chimney that blasts heat into the cold winter air. but it's a myth born from bad science. the idea came from a 1950s military experiment where soldiers in freezing conditions wore winter gear except on their heads. of course, they lost more heat there. that was the only bare skin exposed. the truth is, heat escapes from any uncovered skin, and it's proportional to the surface area. your head is only about 10% of your body. so, unless you're some kind of giant floating head, it's not where you're losing most of your warmth. if you went outside naked wearing just a hat, you'd still freeze in minutes. of course, a hat still helps in winter, but so do pants, gloves, socks, and literally anything else covering your skin. if you want to stay warm, dress like a human. owls are wise. owls have been the animal symbol for wisdom forever. ancient greece made them athena's mascot. story books give them glasses and cartoons treat them like professors. they're perched on the shoulders of wizards dishing out advice in magical forests. and for centuries, we've treated them like nature's philosophers. but in reality, owls aren't the geniuses of the bird world. they're more like the strong, silent type. yes, they're incredible hunters, but that's instinct, not iq. they're knight assassins, not professors. compare them to crows or ravens, which can solve puzzles, recognize human faces, and even use tools. and owls look kind of clueless. crows can drop nuts on crosswalks, so cars crack them open. owls, they just sit there looking mysterious. their huge eyes and fixed stare make them seem deep and thoughtful. but that's just biology, not them being all deep. so next time you see an owl staring into the distance, it's not thinking about life's big questions. it's thinking mouse or frog. chickens can live without their heads for a few seconds. everyone knows the phrase running around like a headless chicken, but most people think the story ends in seconds. you chop off the head, a little flapping, and then done. but the truth is way stranger. sometimes that headless chicken doesn't just twitch. it keeps on living. not for seconds, not even for minutes, but for hours. in one famous case from 1945, a chicken named mike lived for 18 months after losing his head. how is that even possible? turns out the brain stem, which controls basic life functions like breathing and heartbeat, can stay intact if the cut is high enough. so mike's body just kept going. farmers fed him through an eyropper straight into his throat, and he became a national celebrity, traveling the us as the headless wonder chicken. think about that for a second. you're looking at a chicken with no face, no eyes, no beak, just a body and a pulse. was he aware? could he feel anything? or was it pure instinct driving him on? scientists aren't sure, and honestly, i couldn't tell you either. i hope you enjoyed this video. please give me video ideas you want to see in the comments.": {
+        "pipeline_status": "no_claim"
+    },
+    "meal of the day.": {
+        "pipeline_status": "no_claim"
+    },
+    "sounds like a golden meal of the day.": {
+        "pipeline_status": "no_claim"
+    },
+    "nope. that line rule of health, right? nope. that line didn't come from some groundbreaking didn't come from some groundbreaking medical discovery. it": {
+        "pipeline_status": "no_claim"
+    },
+    "came from medical discovery. it came from marketing. back in the late 1800s, a guy marketing. back in the late 1800s, a guy": {
+        "pipeline_status": "no_claim"
+    },
+    "blood is blue inside your thing carrots give you at night is orange teeth.": {
+        "pipeline_status": "no_claim"
+    },
+    "thing carrots give you at night is orange teeth.": {
+        "pipeline_status": "no_claim"
     }
 }

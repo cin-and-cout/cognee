@@ -47,6 +47,11 @@ let captionObserver = null; // MutationObserver instance (kept for reset)
 let transcriptMode = false;
 let liveTranscriptWords = [];
 
+// Video playback tracking state for real-time transcript processing
+let transcriptSegments = [];
+let nextSegmentIndex = 0;
+let playbackIntervalId = null;
+
 // =============================================================================
 // Core diff algorithm (word-level) — unchanged from Milestone 10.1
 // =============================================================================
@@ -146,6 +151,96 @@ function emitLiveTranscriptUpdate(forceText = null, sourceOverride = null) {
 }
 
 // =============================================================================
+// Transcript Playback Tracking (Real-time Streaming)
+// =============================================================================
+
+let sentSegmentIndexes = new Set();
+let videoElement = null;
+
+function setupTranscriptPlayback(segments) {
+  transcriptSegments = segments;
+  sentSegmentIndexes.clear();
+
+  videoElement = document.querySelector('video');
+  if (!videoElement) {
+    console.warn("[content.js] ⚠️ Video element not found, retrying setup in 1s.");
+    setTimeout(() => setupTranscriptPlayback(segments), 1000);
+    return;
+  }
+
+  videoElement.removeEventListener("timeupdate", onVideoTimeUpdate);
+  videoElement.removeEventListener("seeked", onVideoSeeked);
+
+  videoElement.addEventListener("timeupdate", onVideoTimeUpdate);
+  videoElement.addEventListener("seeked", onVideoSeeked);
+
+  console.log("[content.js] 🎬 Transcript playback tracking initialized for video:", videoElement);
+
+  // Run once immediately to capture any segment at the current start time
+  onVideoTimeUpdate();
+}
+
+function onVideoTimeUpdate() {
+  if (!videoElement || transcriptSegments.length === 0) return;
+
+  const currentMs = videoElement.currentTime * 1000;
+
+  // Process segments that have been reached by playback
+  for (let i = 0; i < transcriptSegments.length; i++) {
+    const seg = transcriptSegments[i];
+    if (currentMs >= seg.startMs && !sentSegmentIndexes.has(i)) {
+      // Check if it's the active segment (starts before currentMs, and next starts after currentMs)
+      const isLast = (i === transcriptSegments.length - 1);
+      const nextSeg = isLast ? null : transcriptSegments[i + 1];
+      const isActive = isLast ? (currentMs >= seg.startMs) : (currentMs >= seg.startMs && currentMs < nextSeg.startMs);
+
+      // Or if it's within a 3s window of playback start (to catch segments if timeupdate was delayed)
+      const isWithinWindow = (currentMs - 3000 <= seg.startMs && seg.startMs <= currentMs);
+
+      if (isActive || isWithinWindow) {
+        sendTranscriptSegment(seg, i);
+      }
+    }
+  }
+}
+
+function onVideoSeeked() {
+  if (!videoElement || transcriptSegments.length === 0) return;
+
+  const currentMs = videoElement.currentTime * 1000;
+  console.log(`[content.js] 🔍 Video seeked to ${videoElement.currentTime}s (${currentMs}ms). Updating sent segment marks.`);
+
+  // Reset StreamBuffer in background on seek to prevent word blending
+  chrome.runtime.sendMessage({ action: "CLEAR_BUFFER" });
+
+  // Mark all past segments as sent, and future segments as unsent
+  for (let i = 0; i < transcriptSegments.length; i++) {
+    const seg = transcriptSegments[i];
+    if (seg.startMs < currentMs) {
+      sentSegmentIndexes.add(i);
+    } else {
+      sentSegmentIndexes.delete(i);
+    }
+  }
+}
+
+function sendTranscriptSegment(seg, index) {
+  sentSegmentIndexes.add(index);
+  console.log(`[content.js] 🔊 Sending transcript segment [${index}]: "${seg.text}" at ${seg.startMs}ms`);
+
+  const newWords = seg.text ? seg.text.split(/\s+/) : [];
+  globalWordBuffer.push(...newWords);
+  const bufferSnapshot = globalWordBuffer.slice(-100).join(" ");
+
+  chrome.runtime.sendMessage({
+    action: "CAPTION_CHUNK",
+    text: seg.text,
+    bufferSnapshot,
+    speaker: seg.speaker,
+  });
+}
+
+// =============================================================================
 // Buffer / session reset (on video navigation)
 // =============================================================================
 
@@ -159,6 +254,16 @@ function resetBuffer() {
   liveTranscriptWords = [];
   previousWords = [];
   transcriptMode = false;
+
+  // Reset playback tracking
+  sentSegmentIndexes.clear();
+  transcriptSegments = [];
+  if (videoElement) {
+    videoElement.removeEventListener("timeupdate", onVideoTimeUpdate);
+    videoElement.removeEventListener("seeked", onVideoSeeked);
+    videoElement = null;
+  }
+
   // Inform background.js so it can reset transcriptMode flag
   chrome.runtime.sendMessage({ action: "NAVIGATE_FINISH" });
   // Re-arm the transcript probe for the new video (with delay for DOM hydration)
@@ -456,7 +561,10 @@ async function probeForTranscript(attempt = 1, maxAttempts = 3) {
       }
     }
 
-    // 11.1.d — send full transcript to background
+    // Initialize real-time playback tracking for the transcript segments
+    setupTranscriptPlayback(segments);
+
+    // 11.1.d — send full transcript to background (background will just switch mode, not process bulk)
     console.log(
       `[content.js] 📄 FULL_TRANSCRIPT sent: ${segments.length} segments.`,
     );

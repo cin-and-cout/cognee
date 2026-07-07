@@ -1,4 +1,7 @@
 import app.env_init  # noqa: F401
+import os
+# Force local mode for the test suite by clearing any COGNEE_API_KEY
+os.environ.pop("COGNEE_API_KEY", None)
 import asyncio
 
 import pytest

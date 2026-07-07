@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -11,11 +12,7 @@ from app.services.orchestrator import process_incoming_sentence
 @patch("app.services.orchestrator.get_historical_claims", new_callable=AsyncMock)
 @patch("app.services.orchestrator.calculate_numeric_diff")
 @patch("app.services.orchestrator.add_data_points", new_callable=AsyncMock)
-@patch("app.services.orchestrator.cognee.add", new_callable=AsyncMock)
-@patch("app.services.orchestrator.cognee.cognify", new_callable=AsyncMock)
 async def test_orchestrator_numeric_flow(
-    mock_cognify,
-    mock_add,
     mock_add_data_points,
     mock_calc_diff,
     mock_get_hist,
@@ -76,12 +73,13 @@ async def test_orchestrator_numeric_flow(
     assert report["verdict"]["type"] == "numeric"
     assert report["pipeline_status"] == "compared_added"
 
+    # Yield to the event loop so the background ingestion task can execute
+    await asyncio.sleep(0)
+
     mock_extract.assert_called_once()
     mock_get_hist.assert_called_once_with("Inflation", politician_name="Governor Vance")
     mock_calc_diff.assert_called_once_with(hist_claim, new_claim)
     mock_add_data_points.assert_called_once()
-    mock_add.assert_called_once_with("historical_claims", dataset_name="default_dataset")
-    mock_cognify.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -89,11 +87,7 @@ async def test_orchestrator_numeric_flow(
 @patch("app.services.orchestrator.get_historical_claims", new_callable=AsyncMock)
 @patch("app.services.orchestrator.classify_nli_contradiction", new_callable=AsyncMock)
 @patch("app.services.orchestrator.add_data_points", new_callable=AsyncMock)
-@patch("app.services.orchestrator.cognee.add", new_callable=AsyncMock)
-@patch("app.services.orchestrator.cognee.cognify", new_callable=AsyncMock)
 async def test_orchestrator_qualitative_flow(
-    mock_cognify,
-    mock_add,
     mock_add_data_points,
     mock_nli,
     mock_get_hist,
@@ -146,28 +140,25 @@ async def test_orchestrator_qualitative_flow(
     assert report["verdict"]["type"] == "qualitative"
     assert report["pipeline_status"] == "compared_added"
 
+    # Yield to the event loop so the background ingestion task can execute
+    await asyncio.sleep(0)
+
     mock_extract.assert_called_once()
     mock_get_hist.assert_called_once_with("Transit", politician_name="Governor Vance")
     mock_nli.assert_called_once_with(new_claim, hist_claim)
     mock_add_data_points.assert_called_once()
-    mock_add.assert_called_once_with("historical_claims", dataset_name="default_dataset")
-    mock_cognify.assert_called_once()
 
 
 @pytest.mark.asyncio
 @patch("app.services.orchestrator.extract_claim_from_text", new_callable=AsyncMock)
 @patch("app.services.orchestrator.get_historical_claims", new_callable=AsyncMock)
 @patch("app.services.orchestrator.add_data_points", new_callable=AsyncMock)
-@patch("app.services.orchestrator.cognee.add", new_callable=AsyncMock)
-@patch("app.services.orchestrator.cognee.cognify", new_callable=AsyncMock)
-async def test_orchestrator_low_confidence_skips_ingestion(
-    mock_cognify,
-    mock_add,
+async def test_orchestrator_low_confidence_ingests(
     mock_add_data_points,
     mock_get_hist,
     mock_extract,
 ):
-    """When speaker_confidence is 'low', claim must NOT be ingested."""
+    """When speaker_confidence is 'low', claim must STILL be ingested."""
     politician = Politician(name="Unknown Speaker")
     topic = Topic(name="Economy")
 
@@ -192,7 +183,9 @@ async def test_orchestrator_low_confidence_skips_ingestion(
     )
 
     assert report is not None
-    assert report["pipeline_status"] == "skipped_unverified"
-    mock_add_data_points.assert_not_called()
-    mock_add.assert_not_called()
-    mock_cognify.assert_not_called()
+    assert report["pipeline_status"] == "added_unverified"
+
+    # Yield to the event loop so the background ingestion task can execute
+    await asyncio.sleep(0)
+
+    mock_add_data_points.assert_called_once()

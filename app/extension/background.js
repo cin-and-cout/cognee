@@ -2,6 +2,7 @@ let socket = null;
 let reconnectTimer = null;
 let _lastWsUrl = null;      // remembered so auto-reconnect uses the right URL
 let _reconnectAttempts = 0;
+let connectionState = "disconnected";
 const MAX_RECONNECT_ATTEMPTS = 5;
 
 // ============================================================================
@@ -609,7 +610,7 @@ chrome.runtime.onInstalled.addListener(() => {
 // Listen for messages from popup or content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "CONNECT") {
-    connectWebSocket(message.url);
+    connectWebSocket(message.url, true);
 
   } else if (message.action === "DISCONNECT") {
     disconnectWebSocket();
@@ -629,7 +630,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     _setTranscriptMode(true);
     streamBuffer.reset(); // ensure live buffer is clean
-    processFullTranscript(message.segments || []);
+    // Do not call processFullTranscript. Instead, segments are streamed in real time
+    // from content.js as CAPTION_CHUNK messages as the video plays.
 
   } else if (message.action === "DISABLE_CAPTION_SCRAPER") {
     console.log("[bg] 🔇 DISABLE_CAPTION_SCRAPER received — caption processing disabled.");
@@ -653,6 +655,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "TRANSCRIPT_MODE_STATUS") {
     sendResponse({ transcriptMode: _transcriptMode });
     return true; // keep channel open for async response
+
+  } else if (message.action === "GET_CONNECTION_STATE") {
+    sendResponse({ state: connectionState });
+    return true;
 
   // ---------------------------------------------------------------------------
   // Milestone 13.3 — Video Metadata Path
@@ -729,18 +735,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // WebSocket Management
 // ============================================================================
 
-function connectWebSocket(url) {
-  disconnectWebSocket({ clearQueue: false });
-  _lastWsUrl = url || DEFAULT_WS_URL;
-  _reconnectAttempts = 0; // reset on intentional connect
+function connectWebSocket(url, isManual = false) {
+  if (isManual) {
+    disconnectWebSocket();
+    _reconnectAttempts = 0; // reset on manual connection attempt
+  } else {
+    if (socket) {
+      try { socket.close(); } catch (e) {}
+      socket = null;
+    }
+  }
+
+  _lastWsUrl = url;
+  connectionState = "connecting";
+  chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "connecting" });
 
   try {
     socket = new WebSocket(_lastWsUrl);
 
     socket.onopen = () => {
-      console.log("WebSocket connected to " + _lastWsUrl);
+      console.log("WebSocket connected to " + url);
+      connectionState = "connected";
       chrome.storage.local.set({ isRunning: true });
-      chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: true });
+      chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "connected" });
 
       // Drain any sentences that were buffered while the socket was closed
       // (e.g. a full transcript processed before the user clicked Connect).
@@ -748,9 +765,10 @@ function connectWebSocket(url) {
         console.log(`[bg] 🚀 Draining ${pendingSentences.length} queued sentence(s) into backend.`);
         const toSend = pendingSentences.slice();
         pendingSentences = [];
-        toSend.forEach(({ text, speaker, confidence }) => {
+        toSend.forEach(({ text, speaker, confidence, logId }) => {
           try {
             socket.send(JSON.stringify({
+              logId: logId,
               sentence: text,
               speaker: speaker,
               speakerConfidence: confidence,
@@ -773,6 +791,9 @@ function connectWebSocket(url) {
           // yet, retry up to 5 times (250ms total) rather than creating a
           // duplicate entry — this is the root cause of double feed items.
           _attachReportToLog(data.text, data, 0);
+        } else if (data.error) {
+          console.error("[bg] Server returned error message:", data.error);
+          _markMostRecentPendingAsError(data.error);
         }
       } catch (err) {
         console.error("Error parsing WebSocket message:", err);
@@ -785,42 +806,32 @@ function connectWebSocket(url) {
 
     socket.onclose = () => {
       console.log("WebSocket closed");
+      connectionState = "disconnected";
       chrome.storage.local.set({ isRunning: false });
-      chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: false });
+      chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "disconnected" });
+      abortPendingLogs();
 
       // Auto-reconnect with exponential back-off (max 5 attempts)
       if (_lastWsUrl && _reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         _reconnectAttempts++;
         const delayMs = Math.min(1000 * Math.pow(2, _reconnectAttempts - 1), 16000);
         console.log(`[bg] 🔄 Auto-reconnecting in ${delayMs}ms (attempt ${_reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})…`);
-        reconnectTimer = setTimeout(() => connectWebSocket(_lastWsUrl), delayMs);
+        reconnectTimer = setTimeout(() => connectWebSocket(_lastWsUrl, false), delayMs);
       } else if (_reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         console.warn(`[bg] ⚠️  Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Manual reconnect required.`);
       }
     };
   } catch (err) {
     console.error("Connection failed:", err);
+    connectionState = "disconnected";
     chrome.storage.local.set({ isRunning: false });
-    chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: false });
+    chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "disconnected" });
+    abortPendingLogs();
   }
 }
 
-function ensureWebSocketConnected() {
-  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-    return;
-  }
-
-  chrome.storage.local.get(["wsUrl", "isRunning"], (data) => {
-    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-      return;
-    }
-    if (data.isRunning || pendingSentences.length > 0) {
-      connectWebSocket(data.wsUrl || _lastWsUrl || DEFAULT_WS_URL);
-    }
-  });
-}
-
-function disconnectWebSocket({ clearQueue = true } = {}) {
+function disconnectWebSocket() {
+  connectionState = "disconnected";
   if (socket) {
     socket.close();
     socket = null;
@@ -834,6 +845,8 @@ function disconnectWebSocket({ clearQueue = true } = {}) {
     pendingSentences = []; // discard any buffered sentences on explicit disconnect
   }
   chrome.storage.local.set({ isRunning: false });
+  chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "disconnected" });
+  abortPendingLogs();
 }
 
 // ============================================================================
@@ -856,9 +869,15 @@ function _attachReportToLog(text, data, attempt) {
   const MAX_RETRIES = 5;
   const RETRY_MS = 50;
 
+  const normalize = (str) => (str || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const incomingNorm = normalize(text);
+  const logId = data.logId;
+
   chrome.storage.local.get("logs", (store) => {
     const logs = store.logs || [];
-    const existingLog = logs.find((l) => l.text === text);
+    const existingLog = logs.find((l) => 
+      (logId && l.logId === logId) || normalize(l.text) === incomingNorm
+    );
 
     if (existingLog) {
       // Found — attach the report and persist
@@ -878,6 +897,7 @@ function _attachReportToLog(text, data, attempt) {
       // Gave up retrying — create the entry so the verdict is not lost
       console.warn("_attachReportToLog: gave up waiting for log entry, creating fallback.");
       logs.push({ 
+        logId: logId || crypto.randomUUID(),
         timestamp: Date.now(), 
         text, 
         report: data.report, 
@@ -914,17 +934,78 @@ function processFullTranscript(segments) {
   }
 
   const fullText  = segments.map((s) => s.text).join(" ");
-  console.log(`[bg] 📄 processFullTranscript: Received ${segments.length} segments, total ${fullText.length} chars. Sample: "${fullText.substring(0, 200)}..."`);
+  console.log(`[bg] 📄 processFullTranscript: Received ${segments.length} segments, total ${fullText.length} chars.`);
   const sentences = splitIntoSentences(fullText);
 
   console.log(`[bg] 📄 Transcript: split into ${sentences.length} sentences.`);
 
-  sentences.forEach((sentence, i) => {
-    const trimmed = sentence.trim();
-    if (!trimmed) return;
-    
-    console.log(`[bg] 📄 Transcript sentence [${i + 1}/${sentences.length}] (${trimmed.split(/\s+/).length} words): "${trimmed}"`);
-    handleSegmentedSentence(trimmed);
+  chrome.storage.local.get("logs", (data) => {
+    const logs = data.logs || [];
+    const newLogs = [];
+
+    sentences.forEach((sentence) => {
+      const trimmed = sentence.trim();
+      if (!trimmed) return;
+
+      const cleanText = trimmed;
+      const finalSpeaker = currentSpeaker;
+      const logId = crypto.randomUUID();
+
+      // Send to backend
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        const payload = JSON.stringify({ 
+          logId: logId,
+          sentence: cleanText,
+          speaker: finalSpeaker,
+          speakerConfidence: speakerConfidence
+        });
+        socket.send(payload);
+        console.log(`[bg] ✉️  Sentence sent to backend: "${cleanText}" (Speaker: ${finalSpeaker})`);
+      } else {
+        if (pendingSentences.length < MAX_PENDING_SENTENCES) {
+          pendingSentences.push({ text: cleanText, speaker: finalSpeaker, confidence: speakerConfidence, logId: logId });
+          console.log(`[bg] 📬 Queued sentence (${pendingSentences.length}/${MAX_PENDING_SENTENCES}): "${cleanText}"`);
+        }
+      }
+
+      const isConnected = socket && socket.readyState === WebSocket.OPEN;
+      if (!logs.some((l) => l.text === cleanText) && !newLogs.some((l) => l.text === cleanText)) {
+        newLogs.push({
+          logId: logId,
+          timestamp: Date.now(),
+          text: cleanText,
+          report: isConnected ? null : { pipeline_status: "disconnected" },
+          speaker: finalSpeaker,
+          speakerConfidence: speakerConfidence
+        });
+      }
+    });
+
+    if (newLogs.length > 0) {
+      logs.push(...newLogs);
+      while (logs.length > 50) {
+        logs.shift();
+      }
+      chrome.storage.local.set({ logs }, () => {
+        chrome.runtime.sendMessage({ action: "NEW_LOG" });
+        // Set individual timeouts for each new log
+        newLogs.forEach(l => {
+          setTimeout(() => {
+            chrome.storage.local.get("logs", (store) => {
+              const currentLogs = store.logs || [];
+              const targetLog = currentLogs.find(x => x.logId === l.logId);
+              if (targetLog && targetLog.report === null) {
+                console.log(`[bg] ⏱️ Timeout reached for logId ${l.logId}. Marking as timeout.`);
+                targetLog.report = { pipeline_status: "timeout" };
+                chrome.storage.local.set({ logs: currentLogs }, () => {
+                  chrome.runtime.sendMessage({ action: "NEW_LOG" });
+                });
+              }
+            });
+          }, 180000);
+        });
+      });
+    }
   });
 }
 
@@ -936,10 +1017,11 @@ function handleSegmentedSentence(text, speakerOverride = null) {
 
   const cleanText = text.trim();
   const finalSpeaker = speakerOverride ?? currentSpeaker;
-  const instantReport = buildInstantContradictionReport(cleanText);
+  const logId = crypto.randomUUID();
 
   if (socket && socket.readyState === WebSocket.OPEN) {
     const payload = JSON.stringify({ 
+      logId: logId,
       sentence: cleanText,
       speaker: finalSpeaker,
       speakerConfidence: speakerConfidence
@@ -951,7 +1033,7 @@ function handleSegmentedSentence(text, speakerOverride = null) {
     // connects. This is the common case when a full transcript is processed
     // before the user clicks "Connect & Listen".
     if (pendingSentences.length < MAX_PENDING_SENTENCES) {
-      pendingSentences.push({ text: cleanText, speaker: finalSpeaker, confidence: speakerConfidence });
+      pendingSentences.push({ text: cleanText, speaker: finalSpeaker, confidence: speakerConfidence, logId: logId });
       console.log(`[bg] 📬 Queued sentence (${pendingSentences.length}/${MAX_PENDING_SENTENCES}): "${cleanText}"`);
       ensureWebSocketConnected();
     } else {
@@ -962,15 +1044,58 @@ function handleSegmentedSentence(text, speakerOverride = null) {
   chrome.storage.local.get("logs", (data) => {
     const logs = data.logs || [];
     if (!logs.some((l) => l.text === cleanText)) {
+      const isConnected = socket && socket.readyState === WebSocket.OPEN;
       logs.push({
+        logId: logId,
         timestamp: Date.now(),
         text: cleanText,
-        report: instantReport,
-        pendingBackend: Boolean(instantReport),
+        report: isConnected ? null : { pipeline_status: "disconnected" },
         speaker: finalSpeaker,
         speakerConfidence: speakerConfidence
       });
       trimLogs(logs);
+      chrome.storage.local.set({ logs }, () => {
+        chrome.runtime.sendMessage({ action: "NEW_LOG" });
+
+        if (isConnected) {
+          // 180s timeout to mark as "timeout" if still null.
+          // Sized to survive a full 60s key-pool cooldown + LLM call + Cognee ingestion.
+          // (Previously 90s, which fired before the server could respond during rate-limiting.)
+          setTimeout(() => {
+            chrome.storage.local.get("logs", (store) => {
+              const currentLogs = store.logs || [];
+              const targetLog = currentLogs.find(l => l.logId === logId);
+              if (targetLog && targetLog.report === null) {
+                console.log(`[bg] ⏱️ Timeout reached for logId ${logId}. Marking as timeout.`);
+                targetLog.report = { pipeline_status: "timeout" };
+                chrome.storage.local.set({ logs: currentLogs }, () => {
+                  chrome.runtime.sendMessage({ action: "NEW_LOG" });
+                });
+              }
+            });
+          }, 180000);
+        }
+      });
+    }
+  });
+}
+
+/**
+ * Finds all pending logs (where report is null) and marks them as disconnected.
+ * Called when the socket closes or on background script startup/reload.
+ */
+function abortPendingLogs() {
+  chrome.storage.local.get("logs", (store) => {
+    const logs = store.logs || [];
+    let updated = false;
+    logs.forEach(log => {
+      if (log.report === null) {
+        log.report = { pipeline_status: "disconnected" };
+        updated = true;
+      }
+    });
+    if (updated) {
+      console.log("[bg] ⚠️ Aborted pending logs (marked as disconnected)");
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
       });
@@ -978,63 +1103,28 @@ function handleSegmentedSentence(text, speakerOverride = null) {
   });
 }
 
-function trimLogs(logs) {
-  while (logs.length > MAX_LOG_ITEMS) {
-    logs.shift();
-  }
+/**
+ * Finds the most recent log with report === null and marks it as failed with uvicorn error.
+ */
+function _markMostRecentPendingAsError(errMsg) {
+  chrome.storage.local.get("logs", (store) => {
+    const logs = store.logs || [];
+    // Sort logs descending by timestamp to find the newest pending first
+    const sortedPending = logs
+      .filter(l => l.report === null)
+      .sort((a, b) => b.timestamp - a.timestamp);
+    
+    if (sortedPending.length > 0) {
+      const target = sortedPending[0];
+      console.log(`[bg] 🛑 Marking newest pending log as error due to server fault: "${target.text}"`);
+      target.report = { pipeline_status: "error", error: errMsg };
+      chrome.storage.local.set({ logs }, () => {
+        chrome.runtime.sendMessage({ action: "NEW_LOG" });
+      });
+    }
+  });
 }
 
-function clampTranscriptText(text) {
-  const normalized = (text || "").replace(/\s+/g, " ").trim();
-  if (normalized.length <= MAX_TRANSCRIPT_CHARS) {
-    return normalized;
-  }
-  return normalized.slice(normalized.length - MAX_TRANSCRIPT_CHARS);
-}
+// Clean up stale logs on startup
+abortPendingLogs();
 
-function buildInstantContradictionReport(text) {
-  const lower = text.toLowerCase();
-  const defs = [
-    ["breakfast", "Breakfast is the most important meal of the day.", "Breakfast is not the most important meal of the day, and skipping it is not harmful.", "Nutrition"],
-    ["carrot", "Carrots give you night vision.", "Carrots do not give you night vision.", "Nutrition"],
-    ["blue inside your veins", "Blood is blue inside your veins.", "Blood is always red inside your veins, never blue.", "Biology"],
-    ["camels store water", "Camels store water in their humps.", "Camels store fat in their humps, not water.", "Biology"],
-    ["pee on jellyfish", "You should pee on jellyfish stings.", "You should not pee on jellyfish stings as it makes the sting worse.", "First Aid"],
-    ["lightning never strikes", "Lightning never strikes the same place twice.", "Lightning strikes the same place multiple times, such as the Empire State Building which is hit 25 times a year.", "Physics"],
-    ["five senses", "Humans only have five senses.", "Humans have more than five senses, typically between nine and twenty.", "Biology"],
-    ["eight spiders", "Humans swallow eight spiders a year while sleeping.", "Humans do not swallow eight spiders a year while sleeping.", "Biology"],
-    ["sharks can smell", "Sharks can smell a drop of blood from miles away.", "Sharks cannot smell a single drop of blood from miles away.", "Biology"],
-    ["never wake a sleepwalker", "Never wake a sleepwalker.", "Waking a sleepwalker is safe and does not cause a heart attack.", "Medicine"],
-    ["walk the plank", "Pirates made people walk the plank.", "Pirates rarely made people walk the plank; it is mostly fiction.", "History"],
-  ];
-
-  const match = defs.find(([needle]) => lower.includes(needle));
-  if (!match) return null;
-
-  const [, statement, historical, topic] = match;
-  return {
-    pipeline_status: "compared_skipped",
-    new_claim: {
-      statement,
-      claim_date: new Date().toISOString().slice(0, 10),
-      is_numeric: false,
-      value: null,
-      unit: null,
-      metric: null,
-      topic,
-    },
-    historical_claim: {
-      statement: historical,
-      claim_date: "2020-01-01",
-      is_numeric: false,
-      value: null,
-      unit: null,
-      metric: null,
-    },
-    verdict: {
-      label: "Contradicts statement from 2020-01-01",
-      explanation: `Instant precheck: "${statement}" conflicts with the prior record "${historical}". Backend verification is still running.`,
-      type: "qualitative",
-    },
-  };
-}

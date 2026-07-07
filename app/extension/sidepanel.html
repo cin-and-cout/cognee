@@ -307,6 +307,12 @@
       animation: pulse-opacity 1.2s ease-in-out infinite;
     }
 
+    .verdict-badge.rate-limit {
+      background-color: #ff9f43;
+      color: #ffffff;
+      animation: pulse-opacity 1.2s ease-in-out infinite;
+    }
+
     @keyframes pulse-opacity {
       0%, 100% { opacity: 1; }
       50%       { opacity: 0.45; }
@@ -622,7 +628,7 @@
   <div class="card">
     <div class="card-title">Setup</div>
     <label for="ws-url">WebSocket URL</label>
-    <input type="text" id="ws-url" value="ws://localhost:8000/ws/live-speech">
+    <input type="text" id="ws-url" value="ws://127.0.0.1:8000/ws/live-speech">
 
     <div class="status-bar">
       <span>Service State:</span>

@@ -66,8 +66,4 @@ pyrightconfig.json
 .env
 .cognee_system/
 .ruff_cache/
-
-# Dev artifacts
-scratch/
-test_output.txt
-wrongClaims.txt
+logs/

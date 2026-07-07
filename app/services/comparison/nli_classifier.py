@@ -1,12 +1,13 @@
 from typing import Any, Dict, Optional
 import logging
+import time
 
-logger = logging.getLogger(__name__)
-
-from app.services.llm_caller import acreate_structured_output_with_rotation
 from pydantic import BaseModel, Field
+from app.services.llm_caller import acreate_structured_output_with_rotation
 
 from app.schemas import Claim
+
+logger = logging.getLogger(__name__)
 
 
 class LLMGateway:
@@ -73,13 +74,18 @@ async def classify_nli_contradiction(
     historical claim.
     If no historical claim is provided, immediately returns a "No prior record" label.
     """
+    new_snippet = new_claim.statement[:80] + "..." if len(new_claim.statement) > 80 else new_claim.statement
     if not historical_claim:
+        logger.info("No historical claim - early return", extra={"topic_name": new_claim.topic.name, "new_snippet": new_snippet})
         return {
             "label": "No prior record",
             "explanation": (
                 "No prior historical claims were found matching this topic for the politician."
             ),
         }
+        
+    hist_snippet = historical_claim.statement[:80] + "..." if len(historical_claim.statement) > 80 else historical_claim.statement
+    logger.info("classify_nli_contradiction called", extra={"new_date": new_claim.claim_date, "new_snippet": new_snippet, "historical_date": historical_claim.claim_date, "historical_snippet": hist_snippet})
 
     # 1. Run local offline NLI comparison FIRST to bypass LLM rate limit retries and cooldown delays
     new_stmt = new_claim.statement.lower()
@@ -207,21 +213,33 @@ async def classify_nli_contradiction(
     )
 
     try:
-        verdict: NLIVerdictModel = await LLMGateway.acreate_structured_output(
-            text_input=(f"New: {new_claim.statement}\nHistorical: {historical_claim.statement}"),
+        combined_text = f"New: {new_claim.statement}\nHistorical: {historical_claim.statement}"
+        logger.info("LLM call dispatched for NLI", extra={"combined_text_chars": len(combined_text)})
+        t_nli = time.perf_counter()
+        verdict: NLIVerdictModel = await acreate_structured_output_with_rotation(
+            text_input=combined_text,
             system_prompt=formatted_prompt.strip(),
             response_model=NLIVerdictModel,
         )
+        nli_ms = int((time.perf_counter() - t_nli) * 1000)
 
         # Enforce that the label matches target expectation
         label = verdict.label.strip()
         expected_contradict = f"Contradicts statement from {historical_claim.claim_date}"
 
+        logger.info(
+            "LLM verdict received  (%dms)",
+            nli_ms,
+            extra={"raw_label": label, "explanation_snippet": verdict.explanation[:80] + "..." if len(verdict.explanation) > 80 else verdict.explanation},
+        )
+
         # Clean/normalize labels if the LLM output deviates slightly in wording
         if label != "Consistent with prior statements" and label != "No prior record":
             if "contradict" in label.lower():
+                logger.debug("Label normalization triggered", extra={"original_label": label, "normalized_label": expected_contradict})
                 label = expected_contradict
             else:
+                logger.debug("Label normalization triggered", extra={"original_label": label, "normalized_label": "No prior record"})
                 label = "No prior record"
 
         return {
@@ -229,69 +247,8 @@ async def classify_nli_contradiction(
             "explanation": verdict.explanation,
         }
     except Exception as e:
-        # Local offline fallback logic to ensure correct verdict reporting even when LLM is unavailable
-        logger.warning(f"LLM NLI classification failed ({e}). Falling back to local offline NLI classifier.")
-        new_stmt = new_claim.statement.lower()
-        hist_stmt = historical_claim.statement.lower()
-
-        # Simple qualitative keyword-based contradiction detector
-        is_contradiction = False
-
-        # If one states the myth and the other states the correction:
-        if "breakfast" in new_stmt and "breakfast" in hist_stmt:
-            if ("not" in new_stmt) != ("not" in hist_stmt):
-                is_contradiction = True
-        elif "hump" in new_stmt and "hump" in hist_stmt:
-            if ("fat" in new_stmt and "water" in hist_stmt) or ("water" in new_stmt and "fat" in hist_stmt):
-                is_contradiction = True
-        elif "sense" in new_stmt and "sense" in hist_stmt:
-            # Senses numeric / qualitative check
-            if ("five" in new_stmt or " 5 " in new_stmt) != ("five" in hist_stmt or " 5 " in hist_stmt):
-                is_contradiction = True
-        elif "jellyfish" in new_stmt and "jellyfish" in hist_stmt:
-            if ("not" in new_stmt) != ("not" in hist_stmt):
-                is_contradiction = True
-        elif "chameleon" in new_stmt and "chameleon" in hist_stmt:
-            if ("camouflage" in new_stmt and "communicate" in hist_stmt) or ("communicate" in new_stmt and "camouflage" in hist_stmt):
-                is_contradiction = True
-        elif "carrot" in new_stmt and "carrot" in hist_stmt:
-            if ("not" in new_stmt) != ("not" in hist_stmt):
-                is_contradiction = True
-        elif "blood" in new_stmt and "blood" in hist_stmt:
-            if ("blue" in new_stmt and "red" in hist_stmt) or ("red" in new_stmt and "blue" in hist_stmt):
-                is_contradiction = True
-        elif "sleepwalker" in new_stmt and "sleepwalker" in hist_stmt:
-            if ("not" in new_stmt) != ("not" in hist_stmt):
-                is_contradiction = True
-        elif "lightning" in new_stmt and "lightning" in hist_stmt:
-            if ("twice" in new_stmt or "never" in new_stmt) != ("twice" in hist_stmt or "never" in hist_stmt):
-                is_contradiction = True
-        elif "shark" in new_stmt and "shark" in hist_stmt:
-            if ("cannot" in new_stmt or "not" in new_stmt) != ("cannot" in hist_stmt or "not" in hist_stmt):
-                is_contradiction = True
-        elif "spider" in new_stmt and "spider" in hist_stmt:
-            if ("not" in new_stmt or "do not" in new_stmt) != ("not" in hist_stmt or "do not" in hist_stmt):
-                is_contradiction = True
-        elif "plank" in new_stmt and "plank" in hist_stmt:
-            if ("not" in new_stmt or "did not" in new_stmt) != ("not" in hist_stmt or "did not" in hist_stmt):
-                is_contradiction = True
-        elif "heat" in new_stmt and "heat" in hist_stmt:
-            if ("most" in new_stmt or "head" in new_stmt) and (("not" in new_stmt) != ("not" in hist_stmt)):
-                is_contradiction = True
-        elif "owl" in new_stmt and "owl" in hist_stmt:
-            if ("not" in new_stmt or "not wise" in new_stmt) != ("not" in hist_stmt or "not wise" in hist_stmt):
-                is_contradiction = True
-        elif "chicken" in new_stmt and "chicken" in hist_stmt:
-            if ("cannot" in new_stmt or "not" in new_stmt) != ("cannot" in hist_stmt or "not" in hist_stmt):
-                is_contradiction = True
-
-        if is_contradiction:
-            return {
-                "label": f"Contradicts statement from {historical_claim.claim_date}",
-                "explanation": f"The statement '{new_claim.statement}' contradicts the historical record '{historical_claim.statement}' (Local Offline Fallback).",
-            }
-        else:
-            return {
-                "label": "Consistent with prior statements",
-                "explanation": f"The statement '{new_claim.statement}' is consistent with the historical record '{historical_claim.statement}' (Local Offline Fallback).",
-            }
+        logger.warning("Exception caught - fallback label", extra={"exception": e.__class__.__name__, "message": str(e)})
+        return {
+            "label": "No prior record",
+            "explanation": f"Failed to perform qualitative NLI classification due to error: {e}",
+        }

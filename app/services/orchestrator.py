@@ -1,11 +1,39 @@
 import asyncio
 import logging
+import time
 from collections import deque
 from typing import Any, Dict, Optional
 
 from app.services.coreference import SpeechContext
 
 logger = logging.getLogger(__name__)
+
+# Global concurrency limit for LLM calls across ALL pipelines.
+# Prevents rate-limit storms when multiple sentences are processed in parallel.
+# With 3 concurrent pipelines × 2 LLM calls each = up to 6 calls;
+# this semaphore ensures at most 4 are in-flight simultaneously.
+_llm_semaphore: Optional[asyncio.Semaphore] = None
+
+def get_llm_semaphore() -> asyncio.Semaphore:
+    global _llm_semaphore
+    if _llm_semaphore is None:
+        _llm_semaphore = asyncio.Semaphore(4)
+    return _llm_semaphore
+
+
+def _log_ingestion_result(task: asyncio.Task) -> None:
+    """Done-callback for background ingestion tasks. Logs errors without crashing."""
+    try:
+        exc = task.exception()
+        if exc:
+            logger.exception(
+                "   ❌ Background ingestion task failed",
+                exc_info=exc,
+            )
+        else:
+            logger.info("   ✅ Background ingestion task completed successfully")
+    except asyncio.CancelledError:
+        logger.warning("   ⚠️  Background ingestion task was cancelled")
 
 import cognee
 from cognee.tasks.storage import add_data_points
@@ -15,6 +43,7 @@ from app.services.claim_extractor import extract_claim_from_text
 from app.services.comparison.nli_classifier import classify_nli_contradiction
 from app.services.comparison.numeric_diff import calculate_numeric_diff
 from app.services.temporal_search import get_historical_claims
+from app.services.key_pool import AllKeysExhaustedError
 
 
 async def process_incoming_sentence(
@@ -44,16 +73,25 @@ async def process_incoming_sentence(
         return cached_report
     logger.info("⏳ [orchestrator] Cache MISS, starting pipeline")
 
-    # 1. Extract claim
-    new_claim = await extract_claim_from_text(
-        text,
-        politician_name,
-        claim_date,
-        politician_party,
-        sentence_history=sentence_history,
-        speech_context=speech_context,
-    )
-    
+    # ── STAGE 1: Claim Extraction ──────────────────────────────────────────────
+    logger.info("── STAGE 1/4: Claim Extraction ──────────────────────────")
+    t1 = time.perf_counter()
+    try:
+        async with get_llm_semaphore():
+            new_claim = await extract_claim_from_text(
+                text,
+                politician_name,
+                claim_date,
+                politician_party,
+                sentence_history=sentence_history,
+                speech_context=speech_context,
+            )
+    except AllKeysExhaustedError:
+        logger.error("   ❌ Rate limit exhausted — returning rate_limited status")
+        return {"pipeline_status": "rate_limited"}
+
+    t1_ms = int((time.perf_counter() - t1) * 1000)
+
     # Always update context, even if no claim found
     if speech_context is not None:
         speech_context.update(text, sentence_idx)
@@ -62,17 +100,28 @@ async def process_incoming_sentence(
         new_claim.source_type = "live"
 
     if not new_claim:
-        logger.info("🤷 [orchestrator] No claim extracted from sentence")
+        logger.info("   ✖  No claim extracted  (%dms)", t1_ms)
         report = {"pipeline_status": "no_claim"}
         set_cached_verdict(text, report)
         return report
-    logger.info("🎯 [orchestrator] Claim extracted: topic='%s', is_numeric=%s", new_claim.topic.name, new_claim.is_numeric)
 
-    # 2. Retrieve historical claims for the topic
+    logger.info(
+        "   ✅ Claim found  topic=%s  numeric=%s%s  (%dms)",
+        new_claim.topic.name,
+        new_claim.is_numeric,
+        f"  value={new_claim.value}{new_claim.unit}" if new_claim.is_numeric and new_claim.value is not None else "",
+        t1_ms,
+    )
+    logger.info('   stmt     : "%s"', new_claim.statement[:120] + ("…" if len(new_claim.statement) > 120 else ""))
+
+    # ── STAGE 2: Historical Lookup ─────────────────────────────────────────────
+    logger.info("── STAGE 2/4: Historical Lookup ──────────────────────────")
+    t2 = time.perf_counter()
     historical_claims = await get_historical_claims(
         new_claim.topic.name,
         politician_name=new_claim.politician.name,
     )
+    t2_ms = int((time.perf_counter() - t2) * 1000)
 
     if not historical_claims:
         # Fallback to checking general myths or other speakers
@@ -127,11 +176,20 @@ async def process_incoming_sentence(
                     latest_historical = claim
 
     if latest_historical:
-        logger.info("📚 [orchestrator] Found matching historical claim on same concept: '%s' vs '%s'", new_claim.statement, latest_historical.statement)
+        logger.info(
+            "   📚 %d prior claim(s) found  latest=%s  (%dms)",
+            len(historical_claims), latest_historical.claim_date, t2_ms,
+        )
+        logger.info('   prior    : "%s"', latest_historical.statement[:120] + ("…" if len(latest_historical.statement) > 120 else ""))
     else:
-        logger.info("📚 [orchestrator] No matching historical claim found on same concept for '%s'", new_claim.statement)
+        logger.info(
+            "   📭 No prior claims for topic '%s'  (%dms)",
+            new_claim.topic.name, t2_ms,
+        )
 
-    # 3. Perform comparison if a prior record exists
+    # ── STAGE 3: Comparison ────────────────────────────────────────────────────
+    logger.info("── STAGE 3/4: Comparison ─────────────────────────────────")
+    t3 = time.perf_counter()
     if latest_historical:
         if new_claim.is_numeric and latest_historical.is_numeric:
             verdict_diff = calculate_numeric_diff(latest_historical, new_claim)
@@ -146,10 +204,11 @@ async def process_incoming_sentence(
                 "type": "numeric"
             }
         else:
-            verdict = await classify_nli_contradiction(
-                new_claim,
-                latest_historical,
-            )
+            async with get_llm_semaphore():
+                verdict = await classify_nli_contradiction(
+                    new_claim,
+                    latest_historical,
+                )
             verdict["type"] = "qualitative"
     else:
         verdict = {
@@ -159,27 +218,35 @@ async def process_incoming_sentence(
             ),
             "type": "none",
         }
+    t3_ms = int((time.perf_counter() - t3) * 1000)
 
-    # 4. Ingest the new claim historically in the background to minimize response latency
-    should_persist = speaker_confidence in ("high", "medium")
+    label = verdict.get("label", "")
+    verdict_emoji = "🚨" if "contradict" in label.lower() else ("✅" if "consistent" in label.lower() else "—")
+    logger.info("   %s Verdict: %s  (%dms)", verdict_emoji, label, t3_ms)
+
+    # ── STAGE 4: Ingest ────────────────────────────────────────────────────────
+    logger.info("── STAGE 4/4: DB Ingestion ───────────────────────────────")
+    # Always persist claims to db (metadata contains speaker_confidence)
+    should_persist = True
+    claim_snippet = new_claim.statement[:80] + "..." if len(new_claim.statement) > 80 else new_claim.statement
 
     async def run_ingestion():
-        try:
-            await add_data_points([new_claim.politician, new_claim.topic, new_claim])
-            await cognee.add("historical_claims", dataset_name="default_dataset")
-            await cognee.cognify(temporal_cognify=True)
-        except Exception:
-            logger.exception("Background claim ingestion failed — data point was NOT persisted to the graph")
+        logger.info("add_data_points called", extra={"types": ["Politician", "Topic", "Claim"]})
+        start_add = time.time()
+        await add_data_points([new_claim.politician, new_claim.topic, new_claim])
+        logger.info("add_data_points succeeded", extra={"latency_ms": int((time.time() - start_add)*1000)})
 
     if should_persist:
-        asyncio.create_task(run_ingestion())
-        logger.info("💾 [orchestrator] Queued claim ingestion (speaker_confidence=%s)", speaker_confidence)
+        logger.info("   💾 Dispatching background ingestion (non-blocking)...")
+        task = asyncio.create_task(run_ingestion())
+        task.add_done_callback(_log_ingestion_result)
         pipeline_status = "compared_added" if latest_historical else "added_unverified"
     else:
-        logger.info("⚠️ [orchestrator] Skipping ingestion — speaker_confidence='%s' (Unknown Speaker)", speaker_confidence)
+        logger.info(
+            "   ⚠️  Skipping ingestion — speaker_confidence='%s'",
+            speaker_confidence,
+        )
         pipeline_status = "compared_skipped" if latest_historical else "skipped_unverified"
-    # Yield control to event loop so background task can start executing
-    await asyncio.sleep(0.001)
 
     # 5. Build and return report
     report = {
@@ -208,7 +275,8 @@ async def process_incoming_sentence(
         "pipeline_status": pipeline_status,
     }
 
-    # Save to cache
-    set_cached_verdict(text, report)
+    # Save to cache (only for successful end states)
+    if pipeline_status not in ("rate_limited", "ingest_timeout", "ingest_error", "error"):
+        set_cached_verdict(text, report)
 
     return report

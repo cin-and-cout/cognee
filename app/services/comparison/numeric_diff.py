@@ -1,6 +1,9 @@
+import logging
 from typing import Any, Dict
 
 from app.schemas import Claim
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_numeric_diff(old_claim: Claim, new_claim: Claim) -> Dict[str, Any]:
@@ -15,10 +18,14 @@ def calculate_numeric_diff(old_claim: Claim, new_claim: Claim) -> Dict[str, Any]
         - verdict (str): Human-readable comparison summary
     """
     if not old_claim.is_numeric or not new_claim.is_numeric:
+        logger.error("ValueError raised: missing is_numeric", extra={"old_is_numeric": old_claim.is_numeric, "new_is_numeric": new_claim.is_numeric})
         raise ValueError("Both claims must be numeric to compute a numeric diff.")
 
     if old_claim.value is None or new_claim.value is None:
+        logger.error("ValueError raised: missing value", extra={"old_value": old_claim.value, "new_value": new_claim.value})
         raise ValueError("Both claims must have numeric values populated.")
+
+    logger.debug("calculate_numeric_diff called", extra={"old_val": old_claim.value, "old_unit": old_claim.unit, "new_val": new_claim.value, "new_unit": new_claim.unit, "metric": old_claim.metric})
 
     old_val = float(old_claim.value)
     new_val = float(new_claim.value)
@@ -27,6 +34,7 @@ def calculate_numeric_diff(old_claim: Claim, new_claim: Claim) -> Dict[str, Any]
 
     if old_val == 0.0:
         percentage_variance = 0.0 if new_val == 0.0 else float("inf")
+        logger.debug("Zero-division case avoided", extra={"old_val": old_val, "new_val": new_val})
     else:
         percentage_variance = (absolute_drift / abs(old_val)) * 100.0
 
@@ -47,6 +55,8 @@ def calculate_numeric_diff(old_claim: Claim, new_claim: Claim) -> Dict[str, Any]
             f"by an absolute drift of {absolute_drift:.2f}{unit_str} "
             f"(relative change of {percentage_variance:.2f}%)."
         )
+        
+    logger.info("Diff computed", extra={"absolute_drift": round(absolute_drift, 9), "percentage_variance": percentage_variance, "is_consistent": is_consistent})
 
     return {
         "is_consistent": is_consistent,
