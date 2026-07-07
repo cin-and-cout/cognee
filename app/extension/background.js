@@ -2,6 +2,7 @@ let socket = null;
 let reconnectTimer = null;
 let _lastWsUrl = null;      // remembered so auto-reconnect uses the right URL
 let _reconnectAttempts = 0;
+let connectionState = "disconnected";
 const MAX_RECONNECT_ATTEMPTS = 5;
 
 // ============================================================================
@@ -605,7 +606,7 @@ chrome.runtime.onInstalled.addListener(() => {
 // Listen for messages from popup or content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "CONNECT") {
-    connectWebSocket(message.url);
+    connectWebSocket(message.url, true);
 
   } else if (message.action === "DISCONNECT") {
     disconnectWebSocket();
@@ -648,6 +649,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "TRANSCRIPT_MODE_STATUS") {
     sendResponse({ transcriptMode: _transcriptMode });
     return true; // keep channel open for async response
+
+  } else if (message.action === "GET_CONNECTION_STATE") {
+    sendResponse({ state: connectionState });
+    return true;
 
   // ---------------------------------------------------------------------------
   // Milestone 13.3 — Video Metadata Path
@@ -713,18 +718,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // WebSocket Management
 // ============================================================================
 
-function connectWebSocket(url) {
-  disconnectWebSocket();
+function connectWebSocket(url, isManual = false) {
+  if (isManual) {
+    disconnectWebSocket();
+    _reconnectAttempts = 0; // reset on manual connection attempt
+  } else {
+    if (socket) {
+      try { socket.close(); } catch (e) {}
+      socket = null;
+    }
+  }
+
   _lastWsUrl = url;
-  _reconnectAttempts = 0; // reset on intentional connect
+  connectionState = "connecting";
+  chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "connecting" });
 
   try {
     socket = new WebSocket(url);
 
     socket.onopen = () => {
       console.log("WebSocket connected to " + url);
+      connectionState = "connected";
       chrome.storage.local.set({ isRunning: true });
-      chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: true });
+      chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "connected" });
 
       // Drain any sentences that were buffered while the socket was closed
       // (e.g. a full transcript processed before the user clicked Connect).
@@ -773,8 +789,9 @@ function connectWebSocket(url) {
 
     socket.onclose = () => {
       console.log("WebSocket closed");
+      connectionState = "disconnected";
       chrome.storage.local.set({ isRunning: false });
-      chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: false });
+      chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "disconnected" });
       abortPendingLogs();
 
       // Auto-reconnect with exponential back-off (max 5 attempts)
@@ -782,20 +799,22 @@ function connectWebSocket(url) {
         _reconnectAttempts++;
         const delayMs = Math.min(1000 * Math.pow(2, _reconnectAttempts - 1), 16000);
         console.log(`[bg] 🔄 Auto-reconnecting in ${delayMs}ms (attempt ${_reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})…`);
-        reconnectTimer = setTimeout(() => connectWebSocket(_lastWsUrl), delayMs);
+        reconnectTimer = setTimeout(() => connectWebSocket(_lastWsUrl, false), delayMs);
       } else if (_reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         console.warn(`[bg] ⚠️  Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Manual reconnect required.`);
       }
     };
   } catch (err) {
     console.error("Connection failed:", err);
+    connectionState = "disconnected";
     chrome.storage.local.set({ isRunning: false });
-    chrome.runtime.sendMessage({ action: "STATUS_UPDATE", isRunning: false });
+    chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "disconnected" });
     abortPendingLogs();
   }
 }
 
 function disconnectWebSocket() {
+  connectionState = "disconnected";
   if (socket) {
     socket.close();
     socket = null;
@@ -807,6 +826,7 @@ function disconnectWebSocket() {
   streamBuffer.reset();
   pendingSentences = []; // discard any buffered sentences on explicit disconnect
   chrome.storage.local.set({ isRunning: false });
+  chrome.runtime.sendMessage({ action: "STATUS_UPDATE", state: "disconnected" });
   abortPendingLogs();
 }
 
@@ -927,12 +947,13 @@ function processFullTranscript(segments) {
         }
       }
 
+      const isConnected = socket && socket.readyState === WebSocket.OPEN;
       if (!logs.some((l) => l.text === cleanText) && !newLogs.some((l) => l.text === cleanText)) {
         newLogs.push({
           logId: logId,
           timestamp: Date.now(),
           text: cleanText,
-          report: null,
+          report: isConnected ? null : { pipeline_status: "disconnected" },
           speaker: finalSpeaker,
           speakerConfidence: speakerConfidence
         });
@@ -1001,11 +1022,12 @@ function handleSegmentedSentence(text, speakerOverride = null) {
   chrome.storage.local.get("logs", (data) => {
     const logs = data.logs || [];
     if (!logs.some((l) => l.text === cleanText)) {
+      const isConnected = socket && socket.readyState === WebSocket.OPEN;
       logs.push({
         logId: logId,
         timestamp: Date.now(),
         text: cleanText,
-        report: null,
+        report: isConnected ? null : { pipeline_status: "disconnected" },
         speaker: finalSpeaker,
         speakerConfidence: speakerConfidence
       });
@@ -1015,22 +1037,24 @@ function handleSegmentedSentence(text, speakerOverride = null) {
       chrome.storage.local.set({ logs }, () => {
         chrome.runtime.sendMessage({ action: "NEW_LOG" });
 
-        // 180s timeout to mark as "timeout" if still null.
-        // Sized to survive a full 60s key-pool cooldown + LLM call + Cognee ingestion.
-        // (Previously 90s, which fired before the server could respond during rate-limiting.)
-        setTimeout(() => {
-          chrome.storage.local.get("logs", (store) => {
-            const currentLogs = store.logs || [];
-            const targetLog = currentLogs.find(l => l.logId === logId);
-            if (targetLog && targetLog.report === null) {
-              console.log(`[bg] ⏱️ Timeout reached for logId ${logId}. Marking as timeout.`);
-              targetLog.report = { pipeline_status: "timeout" };
-              chrome.storage.local.set({ logs: currentLogs }, () => {
-                chrome.runtime.sendMessage({ action: "NEW_LOG" });
-              });
-            }
-          });
-        }, 180000);
+        if (isConnected) {
+          // 180s timeout to mark as "timeout" if still null.
+          // Sized to survive a full 60s key-pool cooldown + LLM call + Cognee ingestion.
+          // (Previously 90s, which fired before the server could respond during rate-limiting.)
+          setTimeout(() => {
+            chrome.storage.local.get("logs", (store) => {
+              const currentLogs = store.logs || [];
+              const targetLog = currentLogs.find(l => l.logId === logId);
+              if (targetLog && targetLog.report === null) {
+                console.log(`[bg] ⏱️ Timeout reached for logId ${logId}. Marking as timeout.`);
+                targetLog.report = { pipeline_status: "timeout" };
+                chrome.storage.local.set({ logs: currentLogs }, () => {
+                  chrome.runtime.sendMessage({ action: "NEW_LOG" });
+                });
+              }
+            });
+          }, 180000);
+        }
       });
     }
   });

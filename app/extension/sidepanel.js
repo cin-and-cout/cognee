@@ -19,8 +19,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   chrome.storage.local.get(["wsUrl", "isRunning", "logs"], (data) => {
     if (data.wsUrl) wsUrlInput.value = data.wsUrl;
-    updateUI(data.isRunning || false);
     renderFeed(data.logs || []);
+    // Query active state from background on load
+    chrome.runtime.sendMessage({ action: "GET_CONNECTION_STATE" }, (resp) => {
+      const state = (resp && resp.state) || (data.isRunning ? "connected" : "disconnected");
+      updateUI(state);
+    });
   });
 
   // 11.2.e — Query transcript mode status on load
@@ -31,22 +35,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ============================================================================
-  // Connect / Disconnect toggle (unchanged from previous milestone)
+  // Connect / Disconnect toggle
   // ============================================================================
 
   toggleBtn.addEventListener("click", () => {
-    chrome.storage.local.get("isRunning", (data) => {
-      const nextState = !data.isRunning;
-      const wsUrl = wsUrlInput.value.trim();
-
-      chrome.storage.local.set({ wsUrl, isRunning: nextState }, () => {
-        updateUI(nextState);
-        chrome.runtime.sendMessage({
-          action: nextState ? "CONNECT" : "DISCONNECT",
-          url: wsUrl,
-        });
+    const isConnected = (statusBadge.textContent === "Active");
+    if (isConnected) {
+      chrome.storage.local.set({ isRunning: false }, () => {
+        updateUI("disconnected");
+        chrome.runtime.sendMessage({ action: "DISCONNECT" });
       });
-    });
+    } else {
+      const wsUrl = wsUrlInput.value.trim();
+      chrome.storage.local.set({ wsUrl }, () => {
+        updateUI("connecting");
+        chrome.runtime.sendMessage({ action: "CONNECT", url: wsUrl });
+      });
+    }
   });
 
   // ============================================================================
@@ -88,7 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === "STATUS_UPDATE") {
-      updateUI(message.isRunning);
+      updateUI(message.state);
     } else if (message.action === "NEW_LOG") {
       chrome.storage.local.get("logs", (data) => {
         renderFeed(data.logs || []);
@@ -103,17 +108,27 @@ document.addEventListener("DOMContentLoaded", () => {
   // UI helpers
   // ============================================================================
 
-  function updateUI(isRunning) {
-    if (isRunning) {
+  function updateUI(state) {
+    if (state === "connected") {
       statusBadge.textContent = "Active";
       statusBadge.className   = "badge connected";
       toggleBtn.textContent   = "Disconnect";
       toggleBtn.className     = "btn active";
+      toggleBtn.disabled      = false;
+      chrome.storage.local.set({ isRunning: true });
+    } else if (state === "connecting") {
+      statusBadge.textContent = "Connecting...";
+      statusBadge.className   = "badge rate-limit"; // orange-yellow badge style
+      toggleBtn.textContent   = "Connecting...";
+      toggleBtn.className     = "btn";
+      toggleBtn.disabled      = true;
     } else {
       statusBadge.textContent = "Inactive";
       statusBadge.className   = "badge disconnected";
       toggleBtn.textContent   = "Connect & Listen";
       toggleBtn.className     = "btn";
+      toggleBtn.disabled      = false;
+      chrome.storage.local.set({ isRunning: false });
     }
   }
 
@@ -194,6 +209,8 @@ document.addEventListener("DOMContentLoaded", () => {
       badgeHtml = `<span class="verdict-badge error">⚠️ Processing Error</span>`;
     } else if (log.report.pipeline_status === "ingest_error") {
       badgeHtml = `<span class="verdict-badge error">⚠️ Saved — DB Error</span>`;
+    } else if (log.report.pipeline_status === "disconnected") {
+      badgeHtml = "";
     } else if (
       log.report.pipeline_status === "compared_added" ||
       log.report.pipeline_status === "compared_skipped"
@@ -240,7 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
     wrapper.appendChild(speakerBadge);
 
     // --- Per-report blocks ---
-    if (log.report && log.report.pipeline_status !== "no_claim") {
+    if (log.report && log.report.pipeline_status !== "no_claim" && log.report.pipeline_status !== "disconnected") {
       if (log.report.pipeline_status === "error" || log.report.pipeline_status === "rate_limited") {
         const errorDiv = document.createElement("div");
         errorDiv.className = "error-message";
