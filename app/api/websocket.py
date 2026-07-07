@@ -9,6 +9,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.services.orchestrator import process_incoming_sentence
 from app.services.coreference import SpeechContext
+from app.services.key_pool import AllKeysExhaustedError
+from app.env_init import llm_key_pool
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +136,15 @@ async def websocket_live_speech(websocket: WebSocket):
                             speech_context=s_context,
                             sentence_idx=s_idx,
                         )
+                    except AllKeysExhaustedError as e:
+                        logger.warning("❌ [ws] LLM rate limit: All keys in cooldown. %s", str(e))
+                        cooldowns = llm_key_pool.cooldown_status()
+                        shortest_cooldown = min(cooldowns.values()) if cooldowns else 60.0
+                        report = {
+                            "pipeline_status": "rate_limited",
+                            "error": "All LLM API keys are currently on cooldown. Please wait.",
+                            "cooldown_remaining": round(shortest_cooldown),
+                        }
                     except Exception as e:
                         logger.exception("❌ [ws] Error processing sentence: %s", sent)
                         report = {

@@ -180,7 +180,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // Still waiting for backend response
       badgeHtml = `<span class="verdict-badge analyzing">⏳ Analysing…</span>`;
     } else if (log.report.pipeline_status === "rate_limited") {
-      badgeHtml = `<span class="verdict-badge analyzing">🔁 Rate Limited</span>`;
+      const cooldownSec = log.report.cooldown_remaining || 60;
+      badgeHtml = `<span class="verdict-badge rate-limit">🔁 Rate Limited (${cooldownSec}s cooldown)</span>`;
     } else if (log.report.pipeline_status === "timeout") {
       badgeHtml = `<span class="verdict-badge error">⌛ Timed Out</span>`;
     } else if (log.report.pipeline_status === "no_claim") {
@@ -240,7 +241,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Per-report blocks ---
     if (log.report && log.report.pipeline_status !== "no_claim") {
-      wrapper.appendChild(buildReportBlock(log.report));
+      if (log.report.pipeline_status === "error" || log.report.pipeline_status === "rate_limited") {
+        const errorDiv = document.createElement("div");
+        errorDiv.className = "error-message";
+        errorDiv.style.fontSize = "11px";
+        errorDiv.style.color = "#ff5252";
+        errorDiv.style.fontWeight = "bold";
+        errorDiv.style.marginTop = "8px";
+        errorDiv.style.padding = "6px";
+        errorDiv.style.border = "1px solid #ff5252";
+        errorDiv.style.backgroundColor = "#ffe6e6";
+        errorDiv.textContent = log.report.error || "An unknown error occurred.";
+        wrapper.appendChild(errorDiv);
+      } else {
+        wrapper.appendChild(buildReportBlock(log.report));
+      }
     }
 
     return wrapper;

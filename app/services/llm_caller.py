@@ -32,7 +32,7 @@ async def acreate_structured_output_with_rotation(
         model = os.getenv("LLM_MODEL", "gemini/gemini-3.5-flash")
         while True:
             attempt += 1
-            key = await llm_key_pool.next_key(wait_for_cooldown=True)
+            key = await llm_key_pool.next_key(wait_for_cooldown=False)
             key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "***"
             try:
                 logger.info("LLM call started", extra={"model": model, "key_preview": key_preview, "response_model": response_model.__name__, "attempt": attempt})
